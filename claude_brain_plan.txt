@@ -1,0 +1,503 @@
+Three Levels of Control
+Level 1 — Strategic Overseer (Safest, start here)
+Claude makes high-level decisions but rules-based system still executes:
+
+Morning: "Today is high-volatility, reduce position sizes by 30%, focus PH5 only"
+Midday: "Portfolio is ₹2000 in profit, tighten all stops to breakeven"
+EOD: "BAJFINANCE showed strength, add to PH8 watchlist"
+Level 2 — Active Decision Maker
+Claude approves/rejects every trade before execution:
+
+PH5 finds BAJFINANCE gap → asks Claude → Claude says "YES, 50% size, tight stop"
+PH4 TCAS fires → asks Claude → Claude says "EXIT NOW" or "HOLD, momentum reversing"
+PH1 scan results → Claude picks the top 2 from 5 candidates
+Level 3 — Full Fund Manager (Most powerful, most risky)
+Claude decides what to trade, when, and how much:
+
+Receives full market data every 30 seconds
+Generates its own trade ideas
+Sets its own stops and targets
+Manages portfolio-level risk (correlation, sector exposure, drawdown limits)
+
+
+
+
+● Here's exactly where the system stands:
+
+  ---
+  What's Already Implemented
+
+  Level 1 — Strategic Overseer ✅ FULLY DONE
+
+  ┌────────────────────────────────────────────────────────┬───────────────────────────────────┬─────────────┐
+  │                        Feature                         │               Where               │   Status    │
+  ├────────────────────────────────────────────────────────┼───────────────────────────────────┼─────────────┤
+  │ Morning briefing → NORMAL/CAUTIOUS/DEFENSIVE/CLOSE_ALL │ chatgpt_strategic_advisor.py:2909 │ ✅ Executed │
+  ├────────────────────────────────────────────────────────┼───────────────────────────────────┼─────────────┤
+  │ Per-position AM action: HOLD/TIGHTEN/EXIT/WATCH        │ phase4_portfolio_manager.py:7586  │ ✅ Executed │
+  ├────────────────────────────────────────────────────────┼───────────────────────────────────┼─────────────┤
+  │ should_continue_trading() — EOD shutdown advice        │ orchestrator.py:3258              │ ✅ Advisory │
+  ├────────────────────────────────────────────────────────┼───────────────────────────────────┼─────────────┤
+  │ should_run_adaptive_scan() — midday scan trigger       │ orchestrator.py:3273              │ ✅ Executed │
+  ├────────────────────────────────────────────────────────┼───────────────────────────────────┼─────────────┤
+  │ Portfolio risk assessment (sector, correlation)        │ chatgpt_strategic_advisor.py:1933 │ ✅ Advisory │
+  └────────────────────────────────────────────────────────┴───────────────────────────────────┴─────────────┘
+
+  Level 2 — Active Decision Maker ✅ FULLY DONE
+
+  ┌─────────────────────────────────────────────────────┬───────────────────────────────────────┬─────────────────────┐
+  │                       Feature                       │                 Where                 │       Status        │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Entry GO/NOGO — gates every trade                   │ phase2_intelligent_integration.py:198 │ ✅ Direct execution │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Landmine scan (ASM, SEBI, insider selling) via web  │ chatgpt_strategic_advisor.py:163      │ ✅ Blocks entry     │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Exit evaluation: HOLD/EXIT/TIGHTEN/PARTIAL          │ chatgpt_strategic_advisor.py:2018     │ ✅ Direct execution │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ TCAS RA → consult before acting                     │ phase4_portfolio_manager.py:6441      │ ✅ Executed         │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Landing decision at 14:30 — hold overnight or close │ chatgpt_strategic_advisor.py:2774     │ ✅ Executed         │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Position sizing approval                            │ chatgpt_strategic_advisor.py:1312     │ ✅ Advisory         │
+  ├─────────────────────────────────────────────────────┼───────────────────────────────────────┼─────────────────────┤
+  │ Probabilistic reasoning — P(target), P(stop), EV    │ Inside evaluate_position_for_phase4   │ ✅ Done             │
+  └─────────────────────────────────────────────────────┴───────────────────────────────────────┴─────────────────────┘
+
+  This is more than Level 2. Claude directly closes positions, modifies GTT stops, and blocks entries. It's already execution-critical, not just approving.
+
+  ---
+  What's NOT Yet Done (Level 3 gaps)
+
+  Level 3 — Full Fund Manager ❌ NOT IMPLEMENTED
+
+  ┌────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │                Feature                 │                                                   Gap                                                   │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Self-generated trade ideas             │ Claude only evaluates signals PH1/PH5 finds. It never originates "buy X today" from scratch             │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Full market data every 30 seconds      │ Claude sees position-level data per call. It does NOT receive a live portfolio snapshot on a timer      │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Correlation-aware portfolio management │ assess_portfolio_risk() is advisory-only — it checks but doesn't act on sector concentration            │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Drawdown circuit breaker               │ No "portfolio down ₹X today → pause all entries" rule driven by Claude                                  │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Cross-phase awareness                  │ Claude in PH4 doesn't know PH5 just entered the same sector. No unified portfolio view passed to Claude │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Self-set stops and targets             │ calculate_exit_levels() exists but is advisory — actual GTT is placed by ATR rules by default           │
+  ├────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ PH8 watchlist generation by Claude     │ EOD "add BAJFINANCE to PH8" type decisions are not wired up                                             │
+  └────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  ---
+  What Level 3 Would Add
+
+  Current (Level 2):
+    PH5 finds signal → Claude approves/rejects → PH3 executes
+
+  Level 3 adds:
+    Every 30 seconds → Claude receives:
+      - Full portfolio state (all phases, all positions)
+      - NIFTY live move, sector breadth
+      - Open P&L, day's drawdown
+      - Correlation matrix of current holdings
+
+    Claude can output:
+      - "Pause PH5 entries — 3 positions already correlated with NIFTY"
+      - "Reduce all stops by 50% — market breadth collapsing"
+      - "HDFC showing strength relative to sector — add to PH8"
+      - "Close ICICI + AXIS — same sector, max sector exposure hit"
+
+  The three missing pieces to reach Level 3:
+  1. Unified portfolio feed — single dict with ALL phases' positions sent to Claude every N seconds
+  2. Claude-originated signals — a scheduler that asks Claude "what should I be watching today?" without waiting for PH1/PH5 to find something
+  3. Portfolio-level action executor — Claude's portfolio-wide decisions (pause entries, reduce all stops) wired to actual execution, not just logged
+  
+  
+  > give me the plan for 3 level implementation of this brain
+
+● Claude Brain — 3-Level Implementation Plan
+
+  ---
+  Architecture Overview
+
+  ┌─────────────────────────────────────────────────────┐
+  │              CLAUDE BRAIN CONTROLLER                │
+  │           claude_brain.py  (NEW FILE)               │
+  │                                                     │
+  │  Level 1: Strategic Overseer  (25-min heartbeat)   │
+  │  Level 2: Active Gatekeeper   (per-trade approval) │
+  │  Level 3: Fund Manager Brain  (cross-phase coord)  │
+  └────────────────────┬────────────────────────────────┘
+                       │
+            ┌──────────▼──────────┐
+            │  orchestrator.py    │  ← wires everything
+            └──────────┬──────────┘
+                       │
+      ┌────────────────▼────────────────────────┐
+      │  PH1  PH2  PH3  PH4  PH5  PH6  PH8     │
+      │  (receive directives, report state)     │
+      └─────────────────────────────────────────┘
+
+  ---
+  LEVEL 1 — Strategic Overseer
+
+  Goal: Claude sets the day's tone. Phases operate within that tone.
+  Trigger: Once at 9:10 AM (pre-market) + every 25 min during market hours
+  Already done: portfolio_morning_briefing() — needs restructuring into new format
+
+  Files to touch
+
+  ┌─────────────────────────────┬───────────────────────────────────────────────────┐
+  │            File             │                      Change                       │
+  ├─────────────────────────────┼───────────────────────────────────────────────────┤
+  │ claude_brain.py             │ NEW — Level 1 briefing builder + parser           │
+  ├─────────────────────────────┼───────────────────────────────────────────────────┤
+  │ orchestrator.py             │ Call brain at 9:10 AM + schedule 25-min heartbeat │
+  ├─────────────────────────────┼───────────────────────────────────────────────────┤
+  │ phase4_portfolio_manager.py │ Accept operation_mode directive                   │
+  ├─────────────────────────────┼───────────────────────────────────────────────────┤
+  │ phase5_intraday_engine.py   │ Accept ph5_directive (ACTIVE/SKIP/REDUCED_SIZE)   │
+  ├─────────────────────────────┼───────────────────────────────────────────────────┤
+  │ phase5a_pvat_scanner.py     │ Accept ph5a_directive (ACTIVE/PAUSE)              │
+  └─────────────────────────────┴───────────────────────────────────────────────────┘
+
+  What Claude receives (morning brief)
+
+  {
+    "briefing_type": "MORNING",
+    "time": "09:10",
+    "market": {
+      "nifty_prev_close": 22450,
+      "nifty_futures": 22510,       # pre-open indication
+      "vix": 14.2,
+      "fii_flow_crore": -320,       # yesterday's FII
+      "market_breadth": None,       # not yet, pre-open
+      "expiry_today": False
+    },
+    "portfolio": {
+      "open_positions": [
+        {"symbol": "HDFC", "phase": "PH4", "direction": "LONG",
+         "pnl_pct": +1.8, "health": 72, "tcas": "CLEAR"},
+        {"symbol": "ICICI", "phase": "PH4", "direction": "SHORT",
+         "pnl_pct": -0.4, "health": 51, "tcas": "TA"}
+      ],
+      "capital_deployed_pct": 62,
+      "capital_available": 38000,
+      "yesterday_pnl": +1240,
+      "week_pnl": -800,
+      "max_drawdown_today": 0
+    },
+    "phase_status": {
+      "PH5":  {"fired_today": False, "eligible": True},
+      "PH5A": {"active": True, "candidates_in_queue": 0},
+      "PH6":  {"open_advisories": 1, "paper_pnl": +320},
+      "PH8":  {"weekly_positions": 2}
+    }
+  }
+
+  What Claude returns
+
+  {
+    "market_read": "Cautious — FII selling, VIX rising, futures flat",
+    "operation_mode": "CAUTIOUS",   # NORMAL / CAUTIOUS / DEFENSIVE / PAUSE_ALL
+    "phase_directives": {
+      "PH5":  "ACTIVE",             # ACTIVE / SKIP / REDUCED_SIZE_50
+      "PH5A": "PAUSE",              # ACTIVE / PAUSE
+      "PH4":  "DEFENSIVE",          # NORMAL / DEFENSIVE / AGGRESSIVE
+      "PH6":  "ACTIVE",             # ACTIVE / HOLD
+      "PH8":  "HOLD"                # HOLD / CLOSE_WEAKEST
+    },
+    "position_actions": [
+      {"symbol": "ICICI", "action": "WATCH_CLOSELY",
+       "reason": "TCAS TA + loss, monitor next cycle"},
+      {"symbol": "HDFC",  "action": "TIGHTEN_STOP",
+       "reason": "Good profit, protect it before market opens"}
+    ],
+    "reasoning": "FII outflow + VIX uptick = reduce risk. PH5 ok but size down..."
+  }
+
+  Orchestrator wiring
+
+  # orchestrator.py
+  # 9:10 AM call
+  brain_directive = self.claude_brain.morning_brief(self._build_system_state())
+  self._apply_brain_directive(brain_directive)
+
+  # 25-min heartbeat (10:00, 10:25, 10:50 ... 15:05)
+  def _heartbeat_loop(self):
+      while market_open:
+          brain_directive = self.claude_brain.heartbeat_brief(self._build_system_state())
+          self._apply_brain_directive(brain_directive)
+          sleep(25 * 60)
+
+  ---
+  LEVEL 2 — Active Gatekeeper
+
+  Goal: Claude approves/rejects every signal with cross-phase context.
+  Already done: review_entry_signal(), evaluate_position_for_phase4()
+  Gap: These calls don't know what other phases are doing. Fix that.
+
+  What's missing today
+
+  Current: PH5 asks Claude → "BAJFINANCE gap, score 78, approve?"
+           Claude sees only BAJFINANCE data
+
+  Missing: Claude also needs to know:
+           - PH4 already has 2 Banking sector positions
+           - PH6 just received a BULLISH TCAS pivot on ICICI (Banking)
+           - Portfolio is 65% deployed
+           → Claude can say: "Reject — Banking over-exposed"
+
+  Files to touch
+
+  ┌───────────────────────────────────┬────────────────────────────────────────────────────────┐
+  │               File                │                         Change                         │
+  ├───────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ claude_brain.py                   │ enrich_signal_context(signal) — adds cross-phase state │
+  ├───────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ phase2_intelligent_integration.py │ Pass enriched context to review_entry_signal()         │
+  ├───────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ chatgpt_strategic_advisor.py      │ Accept portfolio_context in entry review prompt        │
+  └───────────────────────────────────┴────────────────────────────────────────────────────────┘
+
+  What gets added to every entry review
+
+  # claude_brain.py
+  def enrich_signal_context(self, signal: dict) -> dict:
+      signal['portfolio_context'] = {
+          "capital_deployed_pct": self._get_deployed_pct(),
+          "sector_exposure": {
+              "Banking": 2,   # positions already in this sector
+              "IT": 0,
+              "Auto": 1
+          },
+          "signal_sector": self._get_sector(signal['symbol']),
+          "correlated_positions": self._find_correlated(signal['symbol']),
+          "today_losses": self._count_losses_today(),
+          "brain_directive_mode": self.current_mode,  # CAUTIOUS etc.
+          "ph6_active_pivots": [...]  # Phase 6 signals pending
+      }
+      return signal
+
+  Gate: Brain directive overrides entry
+
+  # phase2_intelligent_integration.py
+  if self.brain.current_mode == 'DEFENSIVE':
+      logger.info("Brain: DEFENSIVE mode — no new entries")
+      return []   # block all signals regardless of score
+
+  if self.brain.current_mode == 'CAUTIOUS':
+      signal.size_multiplier *= 0.5   # halve all positions
+
+  ---
+  LEVEL 3 — Full Fund Manager Brain
+
+  Goal: Claude coordinates ALL phases together as one portfolio.
+  This is the new work.
+  Trigger: Every 25-min heartbeat (same as Level 1, but deeper output)
+
+  New file: claude_brain.py
+
+  claude_brain.py
+  ├── ClaudeBrain (class)
+  │   ├── __init__()              # load system prompt with ALL phase knowledge
+  │   ├── morning_brief()         # Level 1: pre-market strategic call
+  │   ├── heartbeat_brief()       # Level 3: 25-min full portfolio review
+  │   ├── approve_signal()        # Level 2: entry gatekeeper
+  │   ├── _build_system_state()   # packages full state for Claude
+  │   ├── _parse_directive()      # reads Claude's JSON response
+  │   └── _apply_to_phases()      # sends directives to each phase
+
+  The System Prompt (what Claude knows about "the body")
+
+  This is the most important piece. Claude gets a permanent system prompt that describes every phase:
+
+  You are the Fund Manager Brain for an algorithmic trading system on NSE India.
+  You control 7 phases. Each phase has specific capabilities:
+
+  PHASE 1 (PH1): Market scanner. Runs at 9:00 AM. Finds gap stocks.
+    Output: candidate list with gap%, volume, sector
+    Directive you can give: SCAN / SKIP
+
+  PHASE 2 (PH2): Entry screener. Scores candidates 0-100.
+    Uses: RSI, Kalman, FinBERT, ADX, delivery%, OI
+    Directive: APPROVE {symbol} / REJECT {symbol} / REDUCE_SIZE_50
+
+  PHASE 3 (PH3): Order executor. Places GTT + stop orders.
+    No directive needed — executes PH2 approvals.
+
+  PHASE 4 (PH4): Live position monitor. Tier 1 (MIS/PH5), Tier 2 (CNC/Swing), Tier 3 (PH8 weekly).
+    Has: TCAS (stop protection), ILS (profit trailing), Kalman (momentum prediction)
+    Directive: NORMAL / DEFENSIVE (tighten all stops) / CLOSE_WEAKEST / CLOSE_ALL
+
+  PHASE 5 (PH5): Gap strategy. Fires 9:15-9:22 AM only. Max 1 trade/day. MIS product.
+    Best when: NIFTY gap-up/down with volume, ADX > 20, clean trend
+    Skip when: high VIX, expiry day, FII selling, unclear direction
+    Directive: ACTIVE / SKIP / REDUCED_SIZE_50
+
+  PHASE 5A (PH5A): PVAT breakout scanner. Runs 10:15-14:00. Multiple trades possible.
+    Best when: strong trending market, volume breakouts
+    Directive: ACTIVE / PAUSE
+
+  PHASE 6 (PH6): Options advisory. CALL-only (Bull Call Spread). Paper + Live.
+    Triggers: PH8 momentum fills, TCAS pivot signals from PH4
+    Best when: confirmed directional momentum, > 3 days DTE
+    Directive: ACTIVE / HOLD (don't enter new advisories)
+
+  PHASE 8 (PH8): Weekly momentum strategy. CNC product, multi-day holds.
+    Finds: stocks with weekly momentum + institutional backing
+    Directive: HOLD / ADD_WATCHLIST {symbol} / CLOSE_WEAKEST
+
+  Your job every 25 minutes:
+  1. Read the full system state
+  2. Decide which phases should be active/paused
+  3. Approve or reject any pending signals in the queue
+  4. Issue portfolio-level actions (tighten stops, close positions)
+  5. Return structured JSON only — no prose outside the JSON block
+
+  The 25-min heartbeat briefing (Level 3 full state)
+
+  {
+    "briefing_type": "HEARTBEAT",
+    "time": "10:25",
+    "market": {
+      "nifty_change_pct": +0.42,
+      "nifty_trend_today": "CLIMBING",
+      "vix": 13.8,
+      "advances": 1240, "declines": 310,
+      "breadth": "STRONG_BULL",
+      "sector_movers": {"Banking": +0.8, "IT": -0.2, "Auto": +1.1},
+      "fii_today_crore": +180
+    },
+    "portfolio": {
+      "open_positions": [...],        # all PH4 positions with live state
+      "today_realized_pnl": +840,
+      "unrealized_pnl": +1200,
+      "capital_deployed_pct": 58,
+      "max_drawdown_today": -340,
+      "trades_today": 2
+    },
+    "phase_status": {
+      "PH5":  {"fired_today": True, "result": "HDFC +1.2%", "closed": True},
+      "PH5A": {"active": True, "scans_done": 3, "pending_signals": [
+        {"symbol": "TATAMOTORS", "score": 71, "pattern": "PVAT_BREAKOUT"}
+      ]},
+      "PH4":  {"positions": 3, "any_in_danger": False, "tcas_alerts": []},
+      "PH6":  {"open_advisories": 1, "pending_pivots": []},
+      "PH8":  {"weekly_positions": 2, "watchlist": ["BAJFINANCE", "RELIANCE"]}
+    },
+    "pending_decisions": [
+      {"type": "PH5A_SIGNAL", "symbol": "TATAMOTORS", "score": 71,
+       "sector": "Auto", "awaiting": "APPROVE/REJECT"}
+    ]
+  }
+
+  Claude's response (full fund manager output)
+
+  {
+    "market_read": "Strong bull day — breadth excellent, FII buying, Banking leading",
+    "operation_mode": "NORMAL",
+    "phase_directives": {
+      "PH5":  "SKIP",          # already fired today
+      "PH5A": "ACTIVE",        # good momentum day
+      "PH4":  "NORMAL",        # no danger, let positions run
+      "PH6":  "ACTIVE",
+      "PH8":  "ADD_WATCHLIST BAJFINANCE"
+    },
+    "pending_decisions": {
+      "TATAMOTORS_PH5A": {
+        "decision": "APPROVE",
+        "size_multiplier": 1.0,
+        "reason": "Auto sector +1.1%, breadth strong, score 71 adequate"
+      }
+    },
+    "position_actions": [
+      {"symbol": "HDFC", "action": "EXTEND_TARGET",
+       "reason": "PH5 closed profit, but PH4 holding shows strength — let run"},
+    ],
+    "portfolio_risk": "LOW — 58% deployed, diversified, no sector over-exposure",
+    "reasoning": "Bull day confirmed by breadth + FII. Auto strong. Safe to let..."
+  }
+
+  ---
+  Build Sequence (what to code in order)
+
+  WEEK 1 — Foundation
+    Step 1: claude_brain.py skeleton
+            - ClaudeBrain class
+            - System prompt with all 7 phase descriptions
+            - _build_system_state() — reads from all phases
+            - _parse_directive() — JSON response reader
+
+    Step 2: orchestrator.py
+            - Instantiate ClaudeBrain after all phases init
+            - 9:10 AM morning_brief() call
+            - 25-min heartbeat scheduler
+
+  WEEK 2 — Phase directive handlers
+    Step 3: Each phase accepts directives
+            - PH5:  check brain.ph5_directive before firing
+            - PH5A: check brain.ph5a_directive before scanning
+            - PH4:  accept DEFENSIVE mode → tighten all stops
+            - PH6:  check brain.ph6_directive before new advisories
+
+    Step 4: Level 2 enrichment
+            - enrich_signal_context() adds portfolio snapshot
+            - Brain mode gates entry (DEFENSIVE = no new entries)
+
+  WEEK 3 — Cross-phase intelligence
+    Step 5: Pending signal queue
+            - PH5A queues signals instead of auto-approving
+            - Brain gets "pending_decisions" and approves/rejects
+            - Decision flows back to PH5A within same heartbeat
+
+    Step 6: Portfolio actions executor
+            - Brain says "TIGHTEN_STOP HDFC" → PH4 executes
+            - Brain says "ADD_WATCHLIST BAJFINANCE" → PH8 adds
+            - Brain says "CLOSE_WEAKEST" → PH4 finds and closes
+
+  WEEK 4 — Testing + safety
+    Step 7: Paper mode for brain decisions
+            - Log every brain directive + what happened after
+            - Run 2 weeks paper — did directives improve outcomes?
+            - Build accuracy tracker (like existing GPT audit trail)
+
+    Step 8: Go live with Level 1 + 2 only
+            - Brain sets mode (CAUTIOUS/NORMAL) — phases respect it
+            - Brain approves/rejects with cross-phase context
+            - Level 3 portfolio actions only after paper validation
+
+  ---
+  Risk Controls (non-negotiable)
+
+  1. Brain directive timeout
+     If Claude call fails → last directive stays, max 1 hour
+     After 1 hour without response → fallback to NORMAL mode
+
+  2. Hard overrides (human > brain)
+     Manual CLOSE always executes regardless of brain directive
+     TCAS ALIM always fires — brain cannot block emergency exits
+
+  3. Brain cannot open new positions
+     Brain approves/rejects signals that phases FOUND
+     Brain never originates "buy X" from scratch (Level 3 gate)
+     That stays in Level 3 Phase 2 after paper validation
+
+  4. Directive audit log
+     Every brain decision logged: input state + output directive + market outcome
+     Weekly review: "did CAUTIOUS days outperform NORMAL days?"
+
+  ---
+  Summary
+
+  ┌─────────┬──────────────────────────────────────────┬──────────────────────────┬──────────────────┬───────────────┐
+  │  Level  │                  Status                  │        Core file         │     Trigger      │ Time to build │
+  ├─────────┼──────────────────────────────────────────┼──────────────────────────┼──────────────────┼───────────────┤
+  │ Level 1 │ Partial (briefing exists, no directives) │ claude_brain.py          │ 9:10 AM + 25-min │ Week 1-2      │
+  ├─────────┼──────────────────────────────────────────┼──────────────────────────┼──────────────────┼───────────────┤
+  │ Level 2 │ Partial (no cross-phase context)         │ claude_brain.py + phase2 │ Per signal       │ Week 2        │
+  ├─────────┼──────────────────────────────────────────┼──────────────────────────┼──────────────────┼───────────────┤
+  │ Level 3 │ Not started                              │ claude_brain.py          │ Every 25 min     │ Week 3-4      │
+  └─────────┴──────────────────────────────────────────┴──────────────────────────┴──────────────────┴───────────────┘
+
+  The system already has the muscles. This plan gives Claude the nervous system to control them.

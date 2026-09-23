@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ph5 Gap Strategy — Deep Review</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2230;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --accent4: #d2a8ff;
+    --accent5: #ffa657;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --warn: #f0883e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .header {
+    background: linear-gradient(135deg, #0d1117 0%, #1a2540 60%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 32px 48px 24px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .header .subtitle {
+    color: var(--muted);
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .badge-live   { background: #1a3a1a; color: var(--accent2); border: 1px solid var(--accent2); }
+  .badge-mis    { background: #1a2a3a; color: var(--accent);  border: 1px solid var(--accent); }
+  .badge-window { background: #2a1a3a; color: var(--accent4); border: 1px solid var(--accent4); }
+
+  .container { max-width: 1360px; margin: 0 auto; padding: 32px 48px; }
+
+  .section { margin-bottom: 40px; }
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+    margin-bottom: 20px;
+  }
+
+  /* Summary cards */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 20px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+  .card .desc  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Diagram containers */
+  .diagram-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .diagram-box h3 {
+    font-size: 14px;
+    color: var(--accent4);
+    margin-bottom: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mermaid { display: flex; justify-content: center; }
+
+  /* Component breakdown table */
+  .comp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .comp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .comp-card h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent5);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .comp-card .icon {
+    width: 22px; height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 12px;
+    background: #2a1e0a;
+    border: 1px solid var(--accent5);
+  }
+  .comp-card p  { color: var(--muted); font-size: 12.5px; margin-bottom: 8px; }
+  .comp-card ul { padding-left: 16px; }
+  .comp-card li { color: var(--text); font-size: 12.5px; margin-bottom: 4px; }
+  .comp-card .tag {
+    display: inline-block;
+    background: #1a2a3a;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin: 2px 2px 2px 0;
+  }
+
+  /* Gap states table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface2); color: var(--muted); font-weight: 600; text-align: left;
+       padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1a2230; }
+
+  /* Risk / gap analysis block */
+  .risk-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .risk-card {
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid;
+  }
+  .risk-green  { background: #0d1f0d; border-color: var(--accent2); }
+  .risk-orange { background: #1f1a0d; border-color: var(--warn); }
+  .risk-red    { background: #1f0d0d; border-color: var(--accent3); }
+  .risk-card h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .risk-green  h4 { color: var(--accent2); }
+  .risk-orange h4 { color: var(--warn); }
+  .risk-red    h4 { color: var(--accent3); }
+  .risk-card li { font-size: 12.5px; color: var(--text); margin-bottom: 5px; list-style: none; padding-left: 0; }
+  .risk-card li::before { content: "• "; color: var(--muted); }
+
+  /* Timeline bar */
+  .timeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 20px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .tl-seg {
+    flex: 1;
+    padding: 12px 10px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border-right: 1px solid var(--border);
+  }
+  .tl-seg:last-child { border-right: none; }
+  .tl-seg .time { font-size: 12px; display: block; margin-bottom: 3px; }
+  .tl-seg .desc { font-size: 11px; color: var(--muted); }
+  .tl-pre    { background: #1a1a2a; color: var(--accent4); }
+  .tl-scan   { background: #1a2a1a; color: var(--accent2); }
+  .tl-entry  { background: #1a2a3a; color: var(--accent); }
+  .tl-hold   { background: #2a1a0a; color: var(--accent5); }
+  .tl-cutoff { background: #2a1a1a; color: var(--accent3); }
+  .tl-exit   { background: #1a1a1a; color: var(--muted); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 48px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ Ph5 — Gap Strategy
+    <span class="badge badge-live">LIVE</span>
+    <span class="badge badge-mis">MIS</span>
+    <span class="badge badge-window">09:15–09:50</span>
+  </h1>
+  <div class="subtitle">Algo_Beta · Deep Phase Review · April 2026 · Gap Reversion Strategy on 147-Stock NSE Universe</div>
+</div>
+
+<div class="container">
+
+  <!-- ─── SUMMARY CARDS ─── -->
+  <div class="cards">
+    <div class="card">
+      <div class="label">Universe</div>
+      <div class="value">147</div>
+      <div class="desc">Pre-screened NSE stocks</div>
+    </div>
+    <div class="card">
+      <div class="label">Window</div>
+      <div class="value">35 min</div>
+      <div class="desc">09:15 → 09:50 AM IST</div>
+    </div>
+    <div class="card">
+      <div class="label">Product</div>
+      <div class="value">MIS</div>
+      <div class="desc">Auto square-off, intraday</div>
+    </div>
+    <div class="card">
+      <div class="label">Direction</div>
+      <div class="value">Both</div>
+      <div class="desc">Gap-up shorts + gap-down longs</div>
+    </div>
+    <div class="card">
+      <div class="label">Edge</div>
+      <div class="value">Reversion</div>
+      <div class="desc">Opening gaps fill toward prior close</div>
+    </div>
+    <div class="card">
+      <div class="label">Status</div>
+      <div class="value" style="color:var(--accent2)">Live</div>
+      <div class="desc">30-day confidence run active</div>
+    </div>
+  </div>
+
+  <!-- ─── TRADING WINDOW TIMELINE ─── -->
+  <div class="section">
+    <div class="section-title">Trading Window Breakdown</div>
+    <div class="timeline">
+      <div class="tl-seg tl-pre">
+        <span class="time">Pre 09:15</span>
+        <span class="desc">Universe load<br/>Prior close calc<br/>Gap threshold set</span>
+      </div>
+      <div class="tl-seg tl-scan">
+        <span class="time">09:15–09:20</span>
+        <span class="desc">Opening tick scan<br/>Gap % calc<br/>Volume burst check</span>
+      </div>
+      <div class="tl-seg tl-entry">
+        <span class="time">09:20–09:35</span>
+        <span class="desc">Signal scoring<br/>Order placement<br/>TCAS arm</span>
+      </div>
+      <div class="tl-seg tl-hold">
+        <span class="time">09:35–09:45</span>
+        <span class="desc">Active monitoring<br/>ILS target watch<br/>TCAS proximity</span>
+      </div>
+      <div class="tl-seg tl-cutoff">
+        <span class="time">09:45–09:50</span>
+        <span class="desc">New entry cutoff<br/>Existing positions held<br/>Time-stop alert</span>
+      </div>
+      <div class="tl-seg tl-exit">
+        <span class="time">Post 09:50</span>
+        <span class="desc">No new entries<br/>MIS auto square-off<br/>P&L log to SQLite</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SYSTEM ARCHITECTURE DIAGRAM ─── -->
+  <div class="section">
+    <div class="section-title">System Architecture</div>
+    <div class="diagram-box">
+      <h3>Ph5 Component Map</h3>
+      <div class="mermaid">
+graph TB
+    subgraph PREMARKET["🌙 Pre-Market (before 09:15)"]
+        U[("147-Stock<br/>Universe")]
+        PC[Prior Close<br/>Calculator]
+        GT[Gap Threshold<br/>Config]
+        U --> PC
+        GT --> SCANNER
+    end
+
+    subgraph DATASRC["📡 Data Layer"]
+        KWS["Zerodha Kite<br/>WebSocket Feed"]
+        TICK["Tick Normalizer<br/>(OHLCV aggregator)"]
+        KWS --> TICK
+    end
+
+    subgraph SCANNER["🔭 Ph5 Gap Scanner (09:15)"]
+        GD["Gap Detector<br/>gap% = (open - prev_close)/prev_close"]
+        VB["Volume Burst<br/>Checker (≥1.5× avg)"]
+        GF["Gap Filter<br/>(min/max threshold)"]
+        TICK --> GD
+        PC --> GD
+        GD --> GF
+        GF --> VB
+    end
+
+    subgraph SCORING["🎯 Signal Scoring Engine"]
+        GQ["Gap Quality Score<br/>(size, clean vs messy)"]
+        VS["Volume Score"]
+        TS["Time Score<br/>(earlier = higher)"]
+        DIR["Direction Resolver<br/>(long vs short)"]
+        COMP["Composite Score<br/>(0–100)"]
+        VB --> GQ
+        VB --> VS
+        GQ --> COMP
+        VS --> COMP
+        TS --> COMP
+        DIR --> COMP
+    end
+
+    subgraph DECISION["⚖️ Decision Layer"]
+        THRESH["Score Threshold<br/>(≥70 = enter)"]
+        CAP["Capital Manager<br/>can_enter()"]
+        RISK["Risk Gate<br/>(exposure cap)"]
+        COMP --> THRESH
+        THRESH --> CAP
+        CAP --> RISK
+    end
+
+    subgraph EXECUTION["🚀 Execution Layer"]
+        OP["Order Placer<br/>requests.post() raw API<br/>market_protection=-1"]
+        MIS["MIS Market Order<br/>Zerodha Kite REST"]
+        RISK --> OP
+        OP --> MIS
+    end
+
+    subgraph MONITOR["🛡️ Position Monitor"]
+        TCAS["TCAS<br/>(Stop-Loss Engine)<br/>1.5-2× ATR"]
+        ILS["ILS<br/>(Profit Target)<br/>2-3× ATR"]
+        T1["Tier 1<br/>Fast Check (10s)"]
+        ALIM["ALIM Proximity<br/>(1× ATR warning)"]
+        MIS --> T1
+        T1 --> TCAS
+        T1 --> ILS
+        T1 --> ALIM
+    end
+
+    subgraph EXIT["🏁 Exit Engine"]
+        SL_EXIT["Stop-Loss Exit<br/>(TCAS RA trigger)"]
+        TP_EXIT["Target Exit<br/>(ILS lock-in)"]
+        TIME_EXIT["Time Exit<br/>(MIS square-off)"]
+        TCAS --> SL_EXIT
+        ILS --> TP_EXIT
+    end
+
+    subgraph PERSIST["💾 Persistence & Alerts"]
+        DB[("SQLite<br/>algo_beta.db")]
+        TG["Telegram Bot<br/>(entry/exit alerts)"]
+        GUI["Glass Cockpit GUI<br/>(EICAS gauges)"]
+        SL_EXIT --> DB
+        TP_EXIT --> DB
+        TIME_EXIT --> DB
+        DB --> TG
+        DB --> GUI
+    end
+
+    style PREMARKET fill:#1a1a2e,stroke:#30363d
+    style DATASRC fill:#0d1a2e,stroke:#30363d
+    style SCANNER fill:#0d2e1a,stroke:#3fb950
+    style SCORING fill:#1a0d2e,stroke:#d2a8ff
+    style DECISION fill:#2e1a0d,stroke:#ffa657
+    style EXECUTION fill:#0d1a2e,stroke:#58a6ff
+    style MONITOR fill:#2e0d0d,stroke:#f78166
+    style EXIT fill:#1a1a1a,stroke:#8b949e
+    style PERSIST fill:#0d1a1a,stroke:#30363d
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── EXECUTION FLOW DIAGRAM ─── -->
+  <div class="section">
+    <div class="section-title">Execution Flow — Task by Task</div>
+    <div class="diagram-box">
+      <h3>Ph5 Session Flow (Single Day)</h3>
+      <div class="mermaid">
+flowchart TD
+    START([▶ Session Start\nPre 09:15 AM]) --> LOAD
+    LOAD["📂 Load 147-stock universe\nFetch prior day close prices\nSet gap thresholds from Config"] --> CONNECT
+    CONNECT["🔌 Connect Kite WebSocket\nSubscribe to tick feed\nArm session timer"] --> WAIT
+
+    WAIT{{"⏰ Wait for\n09:15 open tick"}} --> OPENTICK
+    OPENTICK["📊 Receive first open tick\nfor each subscribed symbol"] --> CALCGAP
+
+    CALCGAP["📐 Calculate Gap %\ngap = (open − prev_close) / prev_close × 100\nClassify: Gap-Up / Gap-Down / Flat"] --> FILTER
+
+    FILTER{{"Gap ≥ threshold\nAND ≤ max cap?"}}
+    FILTER -- No --> SKIP["⏭ Skip symbol\n(flat / extreme gap)"]
+    FILTER -- Yes --> VOLCHECK
+
+    VOLCHECK{{"Volume burst\n≥ 1.5× avg?"}}
+    VOLCHECK -- No --> LOWVOL["⚠️ Low-conviction flag\n(may still score low)"]
+    VOLCHECK -- Yes --> SCORE
+
+    LOWVOL --> SCORE
+    SCORE["🎯 Compute Composite Score\n• Gap quality (size, clean/messy)\n• Volume burst weight\n• Time bonus (earlier = higher)\n• Direction clarity"] --> THRESH
+
+    THRESH{{"Score ≥ 70?"}}
+    THRESH -- No --> REJECT["❌ Reject signal\n(log to DB)"]
+    THRESH -- Yes --> CAPCHECK
+
+    CAPCHECK{{"Capital Manager\ncan_enter()?"}}
+    CAPCHECK -- No --> QUEUE["⏳ Queue / skip\n(capital exhausted)"]
+    CAPCHECK -- Yes --> SIZECALC
+
+    SIZECALC["📏 Position Sizing\nATR-based lot size\nRisk % of capital"] --> PLACEORDER
+
+    PLACEORDER["🚀 Place MIS Market Order\nrequests.post() raw API\nmarket_protection=-1\nZerodha REST endpoint"] --> CONFIRM
+
+    CONFIRM{{"Order filled?"}}
+    CONFIRM -- Rejected --> RETRY["🔄 Retry / alert\nTelegram error alert"]
+    CONFIRM -- Filled --> ARM
+
+    ARM["🛡️ Arm Position Monitor\nAdd to Tier 1 fast-check\nSet TCAS stop (1.5–2× ATR)\nSet ILS target (2–3× ATR)\nArm ALIM at 1× ATR proximity"] --> MONITOR_LOOP
+
+    MONITOR_LOOP{{"Tier 1\n10s check cycle"}} --> PRICE_CHECK
+
+    PRICE_CHECK["📈 Check live price vs\nTCAS stop / ILS target\nALIM proximity"] --> DECISION_FORK
+
+    DECISION_FORK{{"Exit\ncondition?"}}
+    DECISION_FORK -- "Price ≤ TCAS stop" --> SL_EXIT
+    DECISION_FORK -- "Price ≥ ILS target" --> TP_EXIT
+    DECISION_FORK -- "ALIM: within 1×ATR\nof stop & moving toward" --> ALIM_EXIT
+    DECISION_FORK -- "09:50 reached" --> TIME_EXIT
+    DECISION_FORK -- "Continue" --> MONITOR_LOOP
+
+    SL_EXIT["🔴 Stop-Loss Exit\nraw requests.post()\nmarket_protection=-1"] --> LOG
+    TP_EXIT["🟢 Profit Target Exit\nraw requests.post()\nmarket_protection=-1"] --> LOG
+    ALIM_EXIT["🟠 ALIM Early Exit\n(proximity warning trigger)"] --> LOG
+    TIME_EXIT["⏱ Time-Based Exit\nor MIS auto square-off"] --> LOG
+
+    LOG["💾 Log to SQLite\n• Trade result\n• Entry/exit price\n• P&L\n• Score at entry\n• Gap %, volume burst"] --> ALERT
+
+    ALERT["📲 Telegram Alert\n• Trade summary\n• Session P&L running total\n• GUI update (Glass Cockpit)"] --> NEXT
+
+    NEXT{{"More positions\nor 09:50 not reached?"}}
+    NEXT -- Yes --> MONITOR_LOOP
+    NEXT -- No --> SESSION_END
+
+    SESSION_END(["🏁 Session End\nPh5 complete\nDaily summary to DB & Telegram"])
+
+    style START fill:#1a3a1a,stroke:#3fb950,color:#3fb950
+    style SESSION_END fill:#1a1a3a,stroke:#58a6ff,color:#58a6ff
+    style SL_EXIT fill:#3a1a1a,stroke:#f78166,color:#f78166
+    style TP_EXIT fill:#1a3a1a,stroke:#3fb950,color:#3fb950
+    style ALIM_EXIT fill:#3a2a1a,stroke:#ffa657,color:#ffa657
+    style TIME_EXIT fill:#2a2a2a,stroke:#8b949e,color:#8b949e
+    style PLACEORDER fill:#0d1a2e,stroke:#58a6ff,color:#58a6ff
+    style ARM fill:#2e1a0d,stroke:#ffa657,color:#ffa657
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── COMPONENT DEEP DIVE ─── -->
+  <div class="section">
+    <div class="section-title">Component Deep Dive</div>
+    <div class="comp-grid">
+
+      <div class="comp-card">
+        <h4><span class="icon">🔭</span> Gap Scanner</h4>
+        <p>Runs at 09:15 open tick. Scans the 147-stock universe for qualifying gap moves against prior session close.</p>
+        <ul>
+          <li>Gap % = <code>(open − prev_close) / prev_close × 100</code></li>
+          <li>Filters: min gap threshold (e.g., >0.5%) and max cap (avoids extreme circuit-breaker gaps)</li>
+          <li>Classifies as Gap-Up (short candidate) or Gap-Down (long candidate)</li>
+          <li>Clean gap vs. messy gap distinction — clean gaps with no prior day fill have higher reversion probability</li>
+        </ul>
+        <br/>
+        <span class="tag">Self-contained</span>
+        <span class="tag">147-stock universe</span>
+        <span class="tag">Kite WebSocket</span>
+      </div>
+
+      <div class="comp-card">
+        <h4><span class="icon">🎯</span> Signal Scoring Engine</h4>
+        <p>Multi-factor composite score (0–100) that weighs gap quality, volume confirmation, and time urgency.</p>
+        <ul>
+          <li><strong>Gap Quality:</strong> Size, cleanliness (no partial fills in prior session), Fibonacci alignment</li>
+          <li><strong>Volume Burst:</strong> Opening volume ≥ 1.5× avg — institutional participation signal</li>
+          <li><strong>Time Bonus:</strong> Earlier entries score higher (09:15–09:20 window > 09:35+)</li>
+          <li><strong>Direction Clarity:</strong> Penalizes ambiguous setups with mixed signals</li>
+          <li>Score ≥ 85 → full size; 70–84 → reduced size; &lt;70 → skip</li>
+        </ul>
+        <br/>
+        <span class="tag">0–100 score</span>
+        <span class="tag">EV-weighted</span>
+        <span class="tag">Time-sensitive</span>
+      </div>
+
+      <div class="comp-card">
+        <h4><span class="icon">🚀</span> Execution Layer</h4>
+        <p>Order placement bypasses pykiteconnect SDK — uses raw <code>requests.post()</code> to comply with SEBI April 2026 mandate.</p>
+        <ul>
+          <li>Endpoint: <code>POST https://api.kite.trade/orders/{variety}</code></li>
+          <li>Injects <code>market_protection=-1</code> as required by NSE/SEBI mandate</li>
+          <li>Auth: <code>api_key</code> + <code>access_token</code> headers</li>
+          <li>Product: <code>MIS</code> (intraday auto square-off)</li>
+          <li>Static IP: Surfshark VPN dedicated IP <code>23.27.229.173</code></li>
+        </ul>
+        <br/>
+        <span class="tag">raw requests.post()</span>
+        <span class="tag">market_protection=-1</span>
+        <span class="tag">MIS</span>
+        <span class="tag">SEBI compliant</span>
+      </div>
+
+      <div class="comp-card">
+        <h4><span class="icon">🛡️</span> TCAS Stop-Loss Engine</h4>
+        <p>Aviation-inspired Collision Avoidance System. Sets and monitors the hard stop for each Ph5 position.</p>
+        <ul>
+          <li>Stop distance: <strong>1.5–2× ATR</strong> from entry price</li>
+          <li>ALIM (proximity warning): triggers when price is within <strong>1× ATR</strong> of stop and moving toward it</li>
+          <li>Tier 1 fast-check pipeline: 10-second cycle</li>
+          <li><strong>Known gap (P1 fix):</strong> ALIM exit not yet wired into Tier 1 — only hard stop triggers. ALIM proximity exit needs to be added to Tier 1 fast-check pipeline</li>
+          <li>Exit uses same raw <code>requests.post()</code> path as entry</li>
+        </ul>
+        <br/>
+        <span class="tag">1.5–2× ATR stop</span>
+        <span class="tag">ALIM proximity</span>
+        <span class="tag">Tier 1 10s cycle</span>
+      </div>
+
+      <div class="comp-card">
+        <h4><span class="icon">🎯</span> ILS Profit Target</h4>
+        <p>Instrument Landing System — locks in profit when price reaches the reward target.</p>
+        <ul>
+          <li>Target: <strong>2–3× ATR</strong> from entry (minimum 1:2 R:R)</li>
+          <li>Monitored in Tier 1 alongside TCAS every 10 seconds</li>
+          <li>Can implement partial exits at 1.5× ATR + trail remainder</li>
+          <li>Gap reversion target: prior session close is the natural magnet / ILS beacon</li>
+        </ul>
+        <br/>
+        <span class="tag">2–3× ATR target</span>
+        <span class="tag">Prior close beacon</span>
+        <span class="tag">1:2+ R:R</span>
+      </div>
+
+      <div class="comp-card">
+        <h4><span class="icon">💾</span> State Persistence</h4>
+        <p>SQLite-backed position state. Known fragility: broker sync can overwrite custom fields on the position dict.</p>
+        <ul>
+          <li>Databases: <code>algo_beta.db</code> (trades) + <code>mission_control.db</code> (state)</li>
+          <li><strong>Known gap (P2 fix):</strong> Fields like <code>breakeven_trail_applied</code>, updated <code>stop_price</code>, <code>exit_retries</code> can be lost between monitoring cycles when broker sync overwrites the position dict</li>
+          <li>Fix: explicitly persist custom fields through reconciliation cycle — snapshot-under-lock → mutate-outside → write-under-lock</li>
+          <li>Telegram bot receives all entry/exit/session summary events</li>
+        </ul>
+        <br/>
+        <span class="tag">SQLite</span>
+        <span class="tag">Telegram alerts</span>
+        <span class="tag">State fragility risk</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── GAP CLASSIFICATION TABLE ─── -->
+  <div class="section">
+    <div class="section-title">Gap Classification &amp; Signal Mapping</div>
+    <div class="diagram-box" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Gap Type</th>
+            <th>Gap %</th>
+            <th>Trade Direction</th>
+            <th>Conviction</th>
+            <th>Target (ILS)</th>
+            <th>Stop (TCAS)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent2)">Gap Up — Clean</td>
+            <td>+0.5% → +2.5%</td>
+            <td>SHORT (reversion)</td>
+            <td style="color:var(--accent2)">High</td>
+            <td>Prior close</td>
+            <td>1.5× ATR above open</td>
+            <td>No partial fill in prior session; strong reversion edge</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent5)">Gap Up — Messy</td>
+            <td>+0.5% → +2.5%</td>
+            <td>SHORT (lower weight)</td>
+            <td style="color:var(--accent5)">Medium</td>
+            <td>0.5× gap fill</td>
+            <td>2× ATR above open</td>
+            <td>Prior session had partial fill; reversion less reliable</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent)">Gap Down — Clean</td>
+            <td>−0.5% → −2.5%</td>
+            <td>LONG (reversion)</td>
+            <td style="color:var(--accent2)">High</td>
+            <td>Prior close</td>
+            <td>1.5× ATR below open</td>
+            <td>Mean reversion + institutional accumulation zone</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent5)">Gap Down — Messy</td>
+            <td>−0.5% → −2.5%</td>
+            <td>LONG (lower weight)</td>
+            <td style="color:var(--accent5)">Medium</td>
+            <td>0.5× gap fill</td>
+            <td>2× ATR below open</td>
+            <td>Cautious — prior session sell pressure may persist</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent3)">Extreme Gap Up</td>
+            <td>&gt;3%</td>
+            <td>SKIP</td>
+            <td style="color:var(--accent3)">None</td>
+            <td>—</td>
+            <td>—</td>
+            <td>Circuit filter / news event — too volatile for reversion</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent3)">Extreme Gap Down</td>
+            <td>&lt;−3%</td>
+            <td>SKIP</td>
+            <td style="color:var(--accent3)">None</td>
+            <td>—</td>
+            <td>—</td>
+            <td>Capitulation / news event — gap may continue, not revert</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Flat Open</td>
+            <td>−0.5% → +0.5%</td>
+            <td>SKIP</td>
+            <td style="color:var(--muted)">None</td>
+            <td>—</td>
+            <td>—</td>
+            <td>No gap edge; Ph5 does not trade flat opens</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── GAPS & RISKS ─── -->
+  <div class="section">
+    <div class="section-title">Known Gaps &amp; Risks (Current State)</div>
+    <div class="risk-grid">
+      <div class="risk-card risk-green">
+        <h4>✅ Working / Resolved</h4>
+        <ul>
+          <li>Raw <code>requests.post()</code> with <code>market_protection=-1</code> — SEBI April 2026 compliant</li>
+          <li>Static IP via Surfshark VPN (<code>23.27.229.173</code>) registered in Kite console</li>
+          <li>MIS product type ensures auto square-off safety net</li>
+          <li>Kite WebSocket tick feed connected and normalized</li>
+          <li>SQLite dual-DB persistence (algo_beta.db + mission_control.db)</li>
+          <li>Telegram alerts on entry/exit/session</li>
+          <li>30-day live confidence run underway</li>
+        </ul>
+      </div>
+      <div class="risk-card risk-orange">
+        <h4>⚠️ Active Bugs (P0/P1/P2 Queue)</h4>
+        <ul>
+          <li><strong>P0 (exit methods):</strong> <code>_place_exit_order_internal</code> and <code>_place_market_order_internal</code> still use pykiteconnect SDK — will be rejected by SEBI mandate. Must switch to raw <code>requests.post()</code></li>
+          <li><strong>P1 (ALIM gap):</strong> Tier 1 monitoring has no ALIM proximity exit — only hard stop trigger fires. Early exit when approaching stop is not implemented</li>
+          <li><strong>P2 (state loss):</strong> Position dict custom fields (<code>breakeven_trail_applied</code>, <code>stop_price</code>, <code>exit_retries</code>) lost between 10s monitoring cycles due to broker sync overwrite</li>
+        </ul>
+      </div>
+      <div class="risk-card risk-red">
+        <h4>🔴 Design Risks to Review</h4>
+        <ul>
+          <li><strong>No entry re-evaluation:</strong> Signal scored at 09:15 tick only — no re-score if market conditions change before fill confirmation</li>
+          <li><strong>Simultaneous fills:</strong> If 5+ stocks qualify at 09:15, Capital Manager ordering and queue priority needs validation</li>
+          <li><strong>Gap continuation risk:</strong> Extreme news gaps can blow through TCAS stops before Tier 1 cycle fires (10s blind spot)</li>
+          <li><strong>MIS square-off timing:</strong> Broker auto square-off window (3:15 PM) may conflict with active TCAS/ILS logic — need explicit time-exit before that window</li>
+          <li><strong><code>CapitalManager.can_enter()</code></strong> missing required <code>entry_size</code> argument — flagged but not yet fixed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SEQUENCE DIAGRAM ─── -->
+  <div class="section">
+    <div class="section-title">Sequence Diagram — Single Trade Lifecycle</div>
+    <div class="diagram-box">
+      <h3>Ph5 Trade: Open → Entry → Monitor → Exit</h3>
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant KWS as Kite WebSocket
+    participant SCAN as Gap Scanner
+    participant SCORE as Scoring Engine
+    participant CAP as Capital Manager
+    participant EXEC as Order Executor
+    participant KAPI as Kite REST API
+    participant T1 as Tier 1 Monitor
+    participant DB as SQLite DB
+    participant TG as Telegram
+
+    Note over KWS,TG: 09:15 AM — Session Opens
+
+    KWS->>SCAN: Open tick (symbol, open_price, volume)
+    SCAN->>SCAN: Calc gap % vs prior close
+    SCAN->>SCORE: GapSignal {symbol, gap%, direction, volume_burst}
+
+    SCORE->>SCORE: Compute composite score (0–100)
+    alt Score ≥ 70
+        SCORE->>CAP: Request entry approval
+        CAP->>CAP: Check capital + exposure limits
+        alt Capital available
+            CAP->>EXEC: Approved {symbol, qty, direction}
+            EXEC->>KAPI: POST /orders/regular<br/>{product:MIS, market_protection:-1}
+            KAPI-->>EXEC: order_id + fill_price
+            EXEC->>T1: Arm monitor {stop=1.5×ATR, target=2×ATR}
+            EXEC->>DB: Log entry {symbol, price, score, gap%, qty}
+            EXEC->>TG: "⚡ Ph5 Entry: SYMBOL SHORT @ ₹XXX"
+        else Capital exhausted
+            CAP-->>SCORE: Rejected — skip
+        end
+    else Score < 70
+        SCORE-->>SCAN: Rejected — log skip
+    end
+
+    Note over T1,TG: Monitoring Phase (10s cycles)
+
+    loop Every 10 seconds
+        T1->>KAPI: Fetch LTP for active positions
+        KAPI-->>T1: Current price
+        alt Price crosses TCAS stop
+            T1->>EXEC: TCAS RA — Stop-Loss EXIT
+            EXEC->>KAPI: POST /orders/regular {exit, market_protection:-1}
+            KAPI-->>EXEC: Exit filled
+            EXEC->>DB: Log exit {reason:TCAS, pnl}
+            EXEC->>TG: "🔴 Ph5 SL Hit: SYMBOL -₹XXX"
+        else Price hits ILS target
+            T1->>EXEC: ILS lock-in — Target EXIT
+            EXEC->>KAPI: POST /orders/regular {exit, market_protection:-1}
+            KAPI-->>EXEC: Exit filled
+            EXEC->>DB: Log exit {reason:ILS, pnl}
+            EXEC->>TG: "🟢 Ph5 Target: SYMBOL +₹XXX"
+        else 09:50 AM reached
+            T1->>EXEC: Time cutoff — force EXIT
+            EXEC->>KAPI: POST /orders/regular {exit}
+            EXEC->>DB: Log exit {reason:TIME}
+            EXEC->>TG: "⏱ Ph5 Time Exit: SYMBOL"
+        end
+    end
+
+    Note over DB,TG: Session End
+    DB->>TG: Daily P&L summary
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── RECOMMENDATIONS ─── -->
+  <div class="section">
+    <div class="section-title">Review Recommendations (Priority Order)</div>
+    <div class="diagram-box" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Priority</th>
+            <th>Area</th>
+            <th>Issue</th>
+            <th>Recommended Fix</th>
+            <th>Risk if Unresolved</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--accent3)"><strong>P0</strong></td>
+            <td>Exit Methods</td>
+            <td>SDK-based exit order methods will be rejected by SEBI April 2026 mandate</td>
+            <td>Replace <code>_place_exit_order_internal</code> and <code>_place_market_order_internal</code> with raw <code>requests.post()</code> + <code>market_protection=-1</code></td>
+            <td>Open positions cannot be exited → unlimited intraday loss → MIS auto-square at worst price</td>
+          </tr>
+          <tr>
+            <td style="color:var(--warn)"><strong>P1</strong></td>
+            <td>TCAS / Tier 1</td>
+            <td>No ALIM proximity exit in Tier 1 fast-check — only hard stop fires</td>
+            <td>Add ALIM check: if price within 1× ATR of stop AND moving toward it → trigger early exit before breach</td>
+            <td>Slippage through stop on fast moves; AUBANK-class loss incidents</td>
+          </tr>
+          <tr>
+            <td style="color:var(--warn)"><strong>P2</strong></td>
+            <td>State Persistence</td>
+            <td>Broker sync overwrites custom position dict fields between 10s cycles</td>
+            <td>Snapshot custom fields before broker sync → re-apply after. Use snapshot-under-lock → process-outside → mutate-under-lock pattern</td>
+            <td>Stop price drift, incorrect trail logic, exit retry failures</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent4)"><strong>P3</strong></td>
+            <td>Capital Manager</td>
+            <td><code>can_enter()</code> missing required <code>entry_size</code> argument</td>
+            <td>Add <code>entry_size</code> param to <code>can_enter()</code> signature and all call sites</td>
+            <td>Runtime error on entry approval — trade silently dropped</td>
+          </tr>
+          <tr>
+            <td style="color:var(--accent4)"><strong>P4</strong></td>
+            <td>Time Exit</td>
+            <td>No explicit time-stop before MIS broker square-off window</td>
+            <td>Add hard time exit at 09:50 (or configurable). Do not rely solely on broker MIS square-off at 3:15</td>
+            <td>Position held beyond Ph5 window; interferes with other phases</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)"><strong>P5</strong></td>
+            <td>Concurrent Signals</td>
+            <td>No documented priority order when 5+ stocks qualify simultaneously at 09:15</td>
+            <td>Confirm Capital Manager sorts by composite score descending before approving entries</td>
+            <td>Capital allocated to lower-conviction trades first</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Algo_Beta · Ph5 Gap Strategy Deep Review · Generated April 17, 2026 · For internal use only
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#161b22',
+      primaryColor: '#1c2230',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#30363d',
+      lineColor: '#58a6ff',
+      secondaryColor: '#0d1117',
+      tertiaryColor: '#1c2230',
+      edgeLabelBackground: '#161b22',
+      clusterBkg: '#1c2230',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      nodeTextColor: '#e6edf3',
+      signalColor: '#58a6ff',
+      signalTextColor: '#e6edf3',
+      activationBorderColor: '#58a6ff',
+      activationBkgColor: '#1c2230',
+      sequenceNumberColor: '#0d1117',
+      noteBkgColor: '#1c2230',
+      noteBorderColor: '#30363d',
+      noteTextColor: '#e6edf3',
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 80, width: 160, mirrorActors: false }
+  });
+</script>
+</body>
+</html>

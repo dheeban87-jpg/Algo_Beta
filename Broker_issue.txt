@@ -1,0 +1,35 @@
+**Re-verified status — what was actually fixed in your Apr 7/8 updates:**
+
+| Issue | Original | Status in new files | Notes |
+|---|---|---|---|
+| ISSUE-1 market_protection | P0 | ✅ **FIXED** | 5 raw API call sites with `mp=-1` |
+| ISSUE-2 copy bug — main paths | P0 | ✅ **FIXED** | `_update_position()` helper exists, 19 call sites. Tier 1 + Tier 2 main monitoring loops + both broker sync paths fixed. Breakeven trail block correctly uses helper. |
+| ISSUE-2 copy bug — Tier 2 fallback paths | P0 | ❌ **STILL BROKEN** | 13 residual `position['x'] =` mutations remain in Tier 2 TCAS pattern alert (L4261), ORB trail fallback (L4383), AI stop adjust (L6637), trailing fallback (L6675), Tier 3 monitoring loop (L10508), ILS trailing (L10563), and 7 others. These fire when GTT modify fails. |
+| ISSUE-3 ATR proximity in Tier 1 | P1 | ✅ **FIXED** | CHECK 0 in place at L9389, calls `TIER1_ATR_PROXIMITY` exit |
+| ISSUE-4 stop fallback warning | P1 | ✅ **FIXED** | Warnings at L2898/L2903 |
+| ISSUE-5 transition guard ignored | P1 | ✅ **FIXED** | `transition_ok` honored at L7657, abort path L7660 |
+| ISSUE-5 status field migration | P1 | ⚠️ **PARTIAL** | 6 residual `position['status'] = 'CLOSED'/'EXITED'` remain at L2556, L4151, L4193, L4327, L7848, L8559. These are in close-side paths (not the OPEN→EXIT_IN_PROGRESS path that was the root cause), but still represent unsynced state. |
+| ISSUE-6 banner P&L stale | P2 | ✅ **AUTO-RESOLVED** | Falls out of ISSUE-2 main path fix |
+| ISSUE-9 BREAKEVEN_TRAIL_TIME removal | P1 | ❌ **NOT FIXED** | Still present at PH4 L9468–9512, handoff field at L2943, PH5 origin not checked yet but likely still there |
+| ISSUE-10 ADX nan reject | P1 | ❌ **NOT FIXED** | Same `info-only` check at PH5 L2178. Worse: new `phase5_gap_strategy.py` L613 silently defaults nan→25 (`adx_values[-1] if not np.isnan(adx_values[-1]) else 25`) — that's a defensive fallback that masks the bug. |
+| ISSUE-11 Kalman direction narrative | P1 | ❌ **NOT FIXED** | Still raw "CLIMBING/DIVING" labels at L6130 |
+| ISSUE-13 ML logger NaT | P3 | ❓ **CAN'T VERIFY** | `ml_logger.py` not in zip |
+| ISSUE-14 No re-entry | P3 | ❓ **CAN'T VERIFY** | Needs trace |
+
+**Important new finding:** There's now a `phase5_gap_strategy.py` (Apr 7, 58KB) — separate from the older `phase5_intraday_engine.py` (Apr 2, 146KB). I haven't checked which one is actually wired up in your orchestrator. If both exist, you may have two parallel PH5 implementations, which is its own concern. The new file silently defaults nan ADX to 25, which is *worse* than the old behavior because it hides the data quality issue from the trader.
+
+**What's left to fix (the new spec needs to cover):**
+
+1. **PHASE 5 — Remove BREAKEVEN_TRAIL_TIME** (not fixed)
+2. **PHASE 6 — ADX nan hard reject** in PH5 entry filter (not fixed) + verify which PH5 file is canonical
+3. **PHASE 7 — Kalman direction-aware narrative** (not fixed)
+4. **PHASE 8 — Tier 2/Tier 3 residual copy bug mutations** (13 sites) — these are fallback paths, lower frequency, but still broken
+5. **PHASE 9 — Migrate remaining `status = 'CLOSED'/'EXITED'` writes** to use orchestrator state machine (6 sites)
+
+**Two questions before I write the spec:**
+
+1. **Is `phase5_gap_strategy.py` (the new file) the live PH5, or is `phase5_intraday_engine.py` (the older file) still the active one?** This determines which file the ADX fix targets. Check your orchestrator's PH5 import line — should be quick.
+
+2. **Do you want PHASE 8 (residual Tier 2/3 copy bug) included now?** These are fallback-path mutations that only fire on GTT failures — relatively rare. The argument FOR including them: they're the same bug class you just fixed and will cause confusing behavior when they do fire. The argument AGAINST: they're not on the live PH5 hot path (Tier 2 = CNC, Tier 3 = PH8 weekly). Your call.
+
+Once you answer these two, I'll write `FIX_REMAINING_ISSUES.md` covering phases 5–9 (or 5–7 if you want to defer 8/9).

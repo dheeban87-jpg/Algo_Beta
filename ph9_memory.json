@@ -1,0 +1,45 @@
+{
+  "version": "3.0.0",
+  "updated": "2026-04-24T15:26:16.125731",
+  "history": [
+    {
+      "date": "2026-04-22",
+      "regime": "CAUTIOUS",
+      "pnl": 0.0,
+      "trades": 1,
+      "approved": 0,
+      "blocked": 0,
+      "wins": 0,
+      "losses": 1,
+      "best": "ASIANPAINT -806",
+      "worst": "ASIANPAINT -806",
+      "api_cost": 5.12
+    },
+    {
+      "date": "2026-04-23",
+      "regime": "NORMAL",
+      "pnl": 0.0,
+      "trades": 0,
+      "approved": 0,
+      "blocked": 0,
+      "wins": 0,
+      "losses": 0,
+      "best": "",
+      "worst": "",
+      "api_cost": 5.98
+    },
+    {
+      "date": "2026-04-24",
+      "regime": "CAUTIOUS",
+      "pnl": 0.0,
+      "trades": 0,
+      "approved": 0,
+      "blocked": 0,
+      "wins": 0,
+      "losses": 0,
+      "best": "",
+      "worst": "",
+      "api_cost": 5.95
+    }
+  ]
+}

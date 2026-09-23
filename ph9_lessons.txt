@@ -1,0 +1,11 @@
+# PH9 Lessons (auto-managed, one per line)
+When morning briefing truncates (entry_window_start logged but directive incomplete), treat the session as HALT-confirmed and do not infer any relaxed parameters from partial config.
+When Nifty sustains +1.5%+ intraday rally from 10:30 onward with VIX holding 18.5-19, activate PH5A NEUTRAL by 11:00 — a +1.5% move with sub-19 VIX is a missed long opportunity under CAUTIOUS.
+VIX 18.5-19 with Nifty >+1.4% for 3+ consecutive heartbeats signals regime upgrade from CAUTIOUS to NORMAL is warranted — do not hold CAUTIOUS posture when both conditions persist past 11:30.
+When CIPLA (or any stock) logs a trade with TIER1_ATR_PROXIMITY tag but shows ₹0 P&L and 0% move, flag as phantom/data-gap trade and exclude from win-rate stats — do not count as a real execution.
+When all 5 trades show 0.00% price move with only stop/ATR/TCAS exit tags and no approved entries logged, treat session as phantom-execution day — exclude all P&L from strategy stats.
+When ADANIGREEN and JSWSTEEL appear in trades despite METALS being in sector_avoid at open, flag as system override gap — add explicit sector-filter audit to morning briefing validation.
+When zero entries are approved yet 5 trades execute with negative P&L, PH4 TCAS/ALIM exits are firing on stale or carry-over positions — verify position slate is clean at session open.
+When MORNING_BRIEFING truncates mid-field (e.g. stop_atr_multiplier cut off), log a BRIEFING_INCOMPLETE alert and default to CAUTIOUS until a full validated config is confirmed.
+When market_bias shifts from BULLISH (morning briefing) to NEUTRAL within the first heartbeat with no trade activity, audit whether the shift was data-driven or a config artifact before accepting it.
+When briefing fires at 12:41 (post-open, not 09:15), all PH5 gap-fade and early PH5A windows are already expired — log LATE_BRIEFING alert and skip PH5 entirely for that session.

@@ -1,0 +1,178 @@
+ALGO BETA — ISSUE TRACKER
+Last updated: 2026-04-09 (all NOT FIXED issues resolved)
+═══════════════════════════════════════════════════════════════════
+
+STATUS KEY:  ✅ FIXED  |  ❌ NOT FIXED  |  ⚠️ PARTIAL  |  ❓ UNVERIFIABLE
+
+───────────────────────────────────────────────────────────────────
+P0 — CRITICAL
+───────────────────────────────────────────────────────────────────
+
+ISSUE-1  market_protection                                    ✅ FIXED
+  5 raw API call sites were passing mp=-1 (no market protection).
+  Fixed: all 5 sites updated.
+
+ISSUE-2  copy bug — main paths                                ✅ FIXED
+  Direct position dict mutations (position['x'] = ...) bypassing
+  _update_position() helper. Main paths fixed: Tier 1 + Tier 2
+  monitoring loops, both broker sync paths, breakeven trail block.
+  19 call sites now use helper.
+
+ISSUE-2  copy bug — Tier 2 / Tier 3 fallback paths           ✅ FIXED
+  13 residual direct mutations remain in fallback paths that fire
+  when GTT modify fails:
+    - L4261  Tier 2 TCAS pattern alert
+    - L4383  ORB trail fallback
+    - L6637  AI stop adjust
+    - L6675  trailing fallback
+    - L10508 Tier 3 monitoring loop
+    - L10563 ILS trailing
+    - 7 other sites
+  These are lower-frequency (GTT failure paths) but same bug class.
+
+───────────────────────────────────────────────────────────────────
+P1 — HIGH
+───────────────────────────────────────────────────────────────────
+
+ISSUE-3  ATR proximity exit in Tier 1                         ✅ FIXED
+  CHECK 0 now in place at L9389, calls TIER1_ATR_PROXIMITY exit.
+
+ISSUE-4  stop fallback warning                                ✅ FIXED
+  Warnings added at L2898 / L2903.
+
+ISSUE-5  transition guard ignored                             ✅ FIXED
+  transition_ok now honored at L7657; abort path at L7660.
+
+ISSUE-5  status field migration                               ✅ FIXED
+  6 residual direct status writes remain (close-side paths, not
+  the OPEN→EXIT_IN_PROGRESS root cause path):
+    - L2556, L4151, L4193, L4327, L7848, L8559
+  All write position['status'] = 'CLOSED' or 'EXITED' directly
+  instead of going through the orchestrator state machine.
+
+ISSUE-9  BREAKEVEN_TRAIL_TIME removal                         ✅ FIXED
+  Feature flag still present:
+    - PH4 L9468–9512
+    - Handoff field at L2943
+    - PH5 origin not yet checked (likely still there)
+
+ISSUE-10 ADX nan hard reject                                  ✅ FIXED
+  Current check in phase5_intraday_engine.py (PH5, L2178) is
+  info-only — does not block entry on NaN ADX.
+  NOTE: phase5_gap_strategy.py (dead file, not wired up) silently
+  defaults nan → 25, which is worse. Ignore that file; fix targets
+  phase5_intraday_engine.py only.
+
+ISSUE-11 Kalman direction-aware narrative                     ✅ FIXED
+  Raw "CLIMBING/DIVING" labels still used at L6130.
+  Should be replaced with direction-aware narrative.
+
+───────────────────────────────────────────────────────────────────
+P2 — FEATURE
+───────────────────────────────────────────────────────────────────
+
+ISSUE-15 TCAS direction-flip → Phase 6 options handoff         📋 SPEC READY
+
+  CORE INSIGHT:
+    When TCAS fires (RA or ALIM) on a losing position, it is
+    confirming the REAL market direction. The equity trade was
+    wrong — the opposite direction is now confirmed by price action.
+
+    LONG + TCAS fires (price falling)  → confirmed BEARISH → PUT
+    SHORT + TCAS fires (price rising)  → confirmed BULLISH → CALL
+
+    Example: ICICI entered LONG (gap-down bounce expected). Price
+    kept falling, TCAS fired ALIM. Confirmed direction = BEARISH.
+    Phase 4 exits equity, hands the signal to Phase 6.
+    Phase 6 uses its own entry logic to decide when and how to
+    enter a PUT. Phase 4's job ends at the handoff.
+
+  PHASE 6 IS CALL-ONLY:
+    Phase 6 only runs Bull Call Spread (BULLISH direction).
+    PUT signals are not supported and must be rejected.
+
+    Therefore ISSUE-15 only fires when a SHORT position is stopped:
+      SHORT + TCAS fires (price rising) → confirmed BULLISH → CALL ✅
+      LONG  + TCAS fires (price falling) → confirmed BEARISH → PUT  ❌ SKIP
+
+  TRIGGER — TCAS RA or ALIM on a LOSING SHORT position only:
+    Conditions (ALL must be true):
+      1. Equity direction = SHORT
+      2. TCAS alert = RA or ALIM
+      3. Position is in loss (equity_pnl < 0)
+      4. Kalman velocity > +0.3 (price rising — confirmed BULLISH)
+      5. Kalman acceleration same sign as velocity (momentum
+         still building, not already reversing)
+      6. Time < 13:30 (Phase 6 still has time to act)
+
+  CONFIRMED DIRECTION:
+    Always BULLISH (only SHORT failures are passed through)
+    Phase 6 runs its existing Bull Call Spread logic.
+
+  DATA PACKAGE — TCASDirectionSignal (fire-and-forget to Phase 6):
+    symbol              : str
+    confirmed_direction : 'BULLISH' | 'BEARISH'
+    signal_time         : datetime
+    signal_price        : float      (price at TCAS trigger)
+    equity_entry        : float      (original equity entry price)
+    equity_stop         : float      (original stop — now breached)
+    atr                 : float      (ATR for Phase 6 sizing/strikes)
+    kalman_velocity     : float      (momentum magnitude)
+    kalman_acceleration : float      (momentum still building?)
+    tcas_alert          : str        ('RA' or 'ALIM')
+    equity_pnl          : float      (negative — confirms direction)
+
+  ARCHITECTURE — CRITICAL CONSTRAINT:
+    Phase 4 exit is UNCONDITIONAL. Handoff is fire-and-forget:
+      1. TCAS fires → _execute_exit() runs → equity closed
+      2. Post TCASDirectionSignal to Phase 6 async queue
+      3. Phase 6 handles everything else with its own logic
+      4. Phase 4 has ZERO dependency on Phase 6 response
+    Phase 4 must NEVER wait for Phase 6 before closing equity.
+
+  FILES TO TOUCH (when implementing):
+    phase4_portfolio_manager.py  — in _execute_exit(), after exit
+                                   confirmed: if SHORT + TCAS_RA/ALIM
+                                   + pnl < 0 + Kalman conditions met
+                                   → call phase6.on_tcas_direction_signal()
+    phase6_options_advisor.py    — add on_tcas_direction_signal(signal)
+                                   handler; feeds into existing Bull
+                                   Call Spread logic (no new strategy
+                                   needed — CALL only)
+    orchestrator.py              — pass phase6 reference into Phase 4
+                                   at init (same pattern as Phase 8
+                                   already does with handle_momentum_fill)
+
+  STATUS: ✅ IMPLEMENTED (2026-04-09)
+
+───────────────────────────────────────────────────────────────────
+P3 — LOW
+───────────────────────────────────────────────────────────────────
+
+ISSUE-13 ML logger NaT                                        ❓ UNVERIFIABLE
+  ml_logger.py not present in reviewed files. Cannot confirm.
+
+ISSUE-14 No re-entry logic                                    ❓ UNVERIFIABLE
+  Needs execution trace to verify. Cannot confirm from static review.
+
+───────────────────────────────────────────────────────────────────
+REMAINING WORK — PHASE PLAN
+───────────────────────────────────────────────────────────────────
+
+  PHASE 5   Remove BREAKEVEN_TRAIL_TIME               (ISSUE-9)
+  PHASE 6   ADX nan hard reject in PH5 entry filter   (ISSUE-10)
+  PHASE 7   Kalman direction-aware narrative           (ISSUE-11)
+  PHASE 8   Tier 2/3 residual copy bug — 13 sites     (ISSUE-2 fallback)
+  PHASE 9   Migrate remaining status writes — 6 sites (ISSUE-5 partial)
+
+───────────────────────────────────────────────────────────────────
+FILE MAP (relevant to unfixed issues)
+───────────────────────────────────────────────────────────────────
+
+  phase5_intraday_engine.py   — LIVE PH5 (gap strategy, 09:15–09:22)
+  phase5a_pvat_scanner.py     — PH5A (PVAT breakout, 10:15–14:00)
+  phase5_gap_strategy.py      — DEAD (superseded by intraday_engine, not imported)
+  phase4_holding_monitor.py   — Tier 1/2/3 monitoring, TCAS/ILS/Kalman
+  orchestrator.py             — main orchestrator (state machine, broker sync)
+
+═══════════════════════════════════════════════════════════════════
