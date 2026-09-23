@@ -113,7 +113,9 @@ import talib
 # Local imports
 from kalman_filter import KalmanFilter, create_kalman_filter
 from ramp_detector import RampDetector
-from finbert_analyzer import FinBERTAnalyzer
+# v5.5.0 (Pi-lite): FinBERT (torch/transformers) is imported lazily below,
+# only when ENABLE_FINBERT is True — keeps this module importable on
+# hosts without torch installed (e.g. Raspberry Pi lite branch).
 from ai_intelligence import AIIntelligence
 from chatgpt_strategic_advisor import ChatGPTStrategicAdvisor
 from news_scraper import NewsScraperFree
@@ -1386,6 +1388,7 @@ class Phase2EntryMonitor:
         if getattr(config, 'ENABLE_AI_INTELLIGENCE', False):
             try:
                 if getattr(config, 'ENABLE_FINBERT', False):
+                    from finbert_analyzer import FinBERTAnalyzer  # lazy: needs torch/transformers
                     self.finbert = FinBERTAnalyzer()
                     self.news_scraper = NewsScraperFree()
                     logger.info("✅ FinBERT + News Scraper initialized")

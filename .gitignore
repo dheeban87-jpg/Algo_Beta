@@ -1,0 +1,14 @@
+# Runtime state — regenerated at run time, not source
+data/
+logs/
+regret_logs/
+__pycache__/
+*.pyc
+
+# Large binaries / archives — don't belong in git history
+*.exe
+*.zip
+
+# Windows quirk: a stray file literally named "nul" (reserved device name)
+nul
+**/nul

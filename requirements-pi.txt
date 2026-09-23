@@ -1,0 +1,40 @@
+# Algo_Beta — Raspberry Pi lite branch requirements
+#
+# Excluded from this branch vs the Windows/full system, and why:
+#   torch, transformers   FinBERT sentiment — heavy (~2GB), slow on ARM CPU.
+#                          ENABLE_FINBERT=False by default here; the code
+#                          imports these lazily only if you turn it back on.
+#   customtkinter, pygame  Desktop GUI (algo_beta_gui/) and sound alerts —
+#                          dropped on this branch. Use Telegram for
+#                          status/alerts on a headless Pi. tkinter itself is
+#                          stdlib and not listed here, but nothing on this
+#                          branch imports it either.
+#
+# TA-Lib needs its C library compiled first — pip alone will fail without
+# it. See PI_SETUP.md before running `pip install -r requirements-pi.txt`.
+#
+# Selenium auto-login is kept on this branch — install chromium-driver via
+# apt (see PI_SETUP.md), do not rely on webdriver_manager to fetch an ARM
+# build automatically.
+
+kiteconnect>=4.2.0
+anthropic>=0.40.0
+openai>=1.0.0
+
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+TA-Lib>=0.4.28
+
+requests>=2.31.0
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+feedparser>=6.0.10
+
+pyotp>=2.9.0
+ntplib>=0.4.0
+psutil>=5.9.0
+
+Pillow>=10.0.0
+matplotlib>=3.7.0
+openpyxl>=3.1.0

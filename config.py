@@ -849,7 +849,9 @@ class Config:
     ENABLE_AI_INTELLIGENCE = True
     
     # FinBERT Settings
-    ENABLE_FINBERT = True
+    # Pi-lite branch: off by default — needs torch/transformers (~2GB, slow on
+    # ARM). Flip to True only if those are installed. See PI_SETUP.md.
+    ENABLE_FINBERT = os.environ.get('ENABLE_FINBERT', 'false').lower() == 'true'
     FINBERT_CONFIDENCE_THRESHOLD = 70
     FINBERT_SENTIMENT_WEIGHT = 0.3
     FINBERT_USE_TEMPORAL_DECAY = True
