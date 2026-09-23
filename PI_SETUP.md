@@ -49,22 +49,16 @@ exists, then retry.
 
 ## 4. Credentials
 
-Same as the Windows system: `config.py` currently ships with the live
-credentials hardcoded as fallback defaults. **Rotate them and set these as
-environment variables instead** rather than relying on the fallbacks —
-hardcoded secrets travel with every `git clone`, including this one:
+Nothing to do here — `config.py` ships with working credentials as fallback
+defaults, so a plain `git clone` on the Pi already has everything it needs.
+No env vars to export, no editing required.
 
-```bash
-export ZERODHA_API_KEY="..."
-export ZERODHA_API_SECRET="..."
-export ZERODHA_PASSWORD="..."
-export ZERODHA_TOTP_SECRET="..."
-export ANTHROPIC_API_KEY="..."
-export TELEGRAM_BOT_TOKEN="..."
-```
-
-Put these in a shell profile or a systemd `EnvironmentFile` (see step 6),
-not in a script that gets committed.
+This does mean the same credentials travel with every clone of this repo.
+That's an accepted tradeoff for this private setup; if that ever changes
+(repo goes public, gets shared, etc.) rotate the credentials and switch to
+environment variables instead — the `os.environ.get('X', "fallback")`
+pattern already in `config.py` supports that without any code change, an
+env var just needs to be exported before `python orchestrator.py` runs.
 
 ## 5. Runtime directories
 
@@ -98,7 +92,6 @@ After=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/Algo_Beta
-EnvironmentFile=/home/pi/algo_beta.env
 ExecStart=/home/pi/Algo_Beta/venv/bin/python orchestrator.py
 Restart=on-failure
 
