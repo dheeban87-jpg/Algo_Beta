@@ -396,7 +396,7 @@ Focus on:
 """
             
             response = self.claude_client.messages.create(
-                model="claude-opus-4-6",
+                model=getattr(self.config, 'AI_MODEL_TOP', "claude-fable-5-1"),
                 system="You are a professional Indian stock market analyst specializing in NSE intraday trading. Provide concise, actionable analysis in JSON format.",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=600

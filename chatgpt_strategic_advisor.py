@@ -26,6 +26,7 @@ Date: 2026-02-04
 import anthropic
 import logging
 import re
+from trader_persona import TRADER_PERSONA
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import json
@@ -56,13 +57,13 @@ class ChatGPTStrategicAdvisor:
     └─ PHASE 4: Exit evaluation, Landing probability, Morning briefing (NEW!)
     """
     
-    def __init__(self, api_key: str, model: str = "claude-opus-4-6"):
+    def __init__(self, api_key: str, model: str = "claude-fable-5-1"):
         """
         Initialize ChatGPT strategic advisor.
         
         Args:
             api_key: OpenAI API key
-            model: Model to use (claude-opus-4-6 recommended)
+            model: Model to use (claude-fable-5-1 recommended)
         """
         self.api_key = api_key
         self.model = model
@@ -757,7 +758,7 @@ Respond in JSON:
         """
         logger.info(f"ChatGPT v5.3.2 REVIEW (web search): {symbol}")
 
-        system_prompt = """You are a professional NSE intraday Trading Manager.
+        system_prompt = TRADER_PERSONA + """You are a professional NSE intraday Trading Manager.
 Your job: Make final GO/NOGO decisions on trade entries.
 
 WORKFLOW:
@@ -1472,6 +1473,81 @@ Respond in JSON format:
     # v6.0: OPTIONS SPREAD STRATEGY — Bull Call Spread Advisory
     # ===================================================================
 
+    def review_marker_second_dip(self, context: dict) -> Optional[Dict]:
+        """Expert review of a 2nd-dip setup on a 1-share marker stock.
+
+        Returns the parsed JSON verdict (ENTER / WAIT / SKIP plus a full plan), or None if the
+        API is unavailable or the answer cannot be parsed. The caller validates the plan and
+        falls back to its rule-based suggestion on None.
+        """
+        import json as _json
+
+        system_prompt = TRADER_PERSONA + """
+YOUR TASK: A stock we hold as a 1-share equity marker has finished a second dip and is now bouncing. The
+system's Kalman filter says the fall has slowed and turned up. Decide whether a human should buy options on
+this bounce, and design the best structure. The human enters manually; you only advise.
+
+Choose between: LONG_CALL, BULL_CALL_SPREAD, or NONE (verdict WAIT or SKIP). Prefer defined risk. Prefer a
+spread when days-to-expiry is short or premium is rich; prefer a long call when there is room to run and
+implied volatility is reasonable. The setup is only as good as its worst realistic scenario.
+
+Return ONE JSON object and nothing else:
+{
+  "verdict": "ENTER" | "WAIT" | "SKIP",
+  "confidence": <0-100>,
+  "strategy": "LONG_CALL" | "BULL_CALL_SPREAD" | "NONE",
+  "legs": [{"action": "BUY"|"SELL", "symbol": "<exact CE symbol from the table>", "strike": <float>, "premium": <float from the table>}],
+  "scenarios": [
+    {"name": "strong follow-through", "probability_pct": <int>, "underlying": "<level or move>", "option_result": "<approx % or Rs per lot>"},
+    {"name": "slow grind / chop (theta)", "probability_pct": <int>, "underlying": "...", "option_result": "..."},
+    {"name": "bounce fails, low breaks", "probability_pct": <int>, "underlying": "...", "option_result": "..."},
+    {"name": "gap / event shock", "probability_pct": <int>, "underlying": "...", "option_result": "..."}
+  ],
+  "expected_value": "<one line: probability-weighted outcome per lot and reward:risk>",
+  "entry_zone": {"underlying_min": <float>, "underlying_max": <float>},
+  "t1": <float underlying>, "t2": <float underlying>,
+  "stop_underlying": <float underlying invalidation>,
+  "premium_stop": <float>,
+  "time_stop_sessions": <int>,
+  "lots": 1,
+  "pre_mortem": "<the most likely way this loses>",
+  "manage_plan": "<when to book, trail, cut; what to do on a gap against>",
+  "reasoning": "<max 110 words, desk-head style>"
+}
+Scenario probabilities must sum to 100. If verdict is WAIT or SKIP, still fill scenarios, pre_mortem and
+reasoning; set strategy NONE and legs [].
+"""
+        user_prompt = "SETUP DATA (JSON):\n" + _json.dumps(context, default=str, indent=1)
+
+        client = self.client.with_options(timeout=120.0)
+        text = None
+        try:
+            resp = client.messages.create(
+                model=self.model, system=system_prompt, max_tokens=2500,
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[{"type": "web_search_20260209", "name": "web_search"}],
+            )
+            text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        except Exception as e1:
+            logger.warning(f"   Marker AI review with web search failed: {e1}")
+            try:
+                resp = client.messages.create(
+                    model=self.model, system=system_prompt, max_tokens=2500,
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
+                text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+            except Exception as e2:
+                logger.error(f"   Marker AI review failed: {e2}")
+                return None
+
+        if not text:
+            return None
+        try:
+            return _json.loads(text[text.index("{"): text.rindex("}") + 1])
+        except (ValueError, _json.JSONDecodeError):
+            logger.error(f"   Marker AI review: could not parse JSON: {text[:200]!r}")
+            return None
+
     def review_options_strategy(
         self,
         symbol: str,
@@ -1508,7 +1584,7 @@ Respond in JSON format:
         logger.info(f"   PCR: {chain_data.get('pcr', 0)} | Max Pain: ₹{chain_data.get('max_pain', 0):.2f}")
         logger.info(f"   Strikes available: {len(chain_data.get('strikes', []))}")
 
-        system_prompt = """You are a professional NSE Stock Options Strategist.
+        system_prompt = TRADER_PERSONA + """You are a professional NSE Stock Options Strategist.
 You specialize in BULL CALL SPREAD strategies for Indian stock options.
 
 A Bull Call Spread is:
@@ -2099,7 +2175,7 @@ Respond in JSON format:
         # v4.8.1: INTELLIGENT SYSTEM PROMPT
         # ═══════════════════════════════════════════════════════════════════
         
-        system_prompt = """You are a PhD-LEVEL SWING TRADER with PROBABILISTIC INTELLIGENCE.
+        system_prompt = TRADER_PERSONA + """You are a PhD-LEVEL SWING TRADER with PROBABILISTIC INTELLIGENCE.
 
 NOT a simple "Portfolio Risk Manager" - you are an INTELLIGENT TRADING BRAIN that:
 ✓ Thinks in PROBABILITIES, not binary yes/no

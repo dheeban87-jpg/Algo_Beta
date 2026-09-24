@@ -711,7 +711,10 @@ class Config:
     CHATGPT_API_KEY = ANTHROPIC_API_KEY
     OPENAI_API_KEY = ANTHROPIC_API_KEY
 
-    AI_MODEL = "claude-opus-4-6"
+    # One switch for the most capable model (strategy, options, briefings). Cheap tactical gates stay on Haiku.
+    AI_MODEL_TOP = "claude-fable-5-1"
+    MARKER_AI_ENABLED = True           # AI expert review of 2nd-dip options setups (falls back to rules)
+    AI_MODEL = AI_MODEL_TOP
     AI_MAX_TOKENS = 3000
     AI_TEMPERATURE = 0.2
     
@@ -1026,7 +1029,7 @@ class Config:
     # ============================================================
     
     ENABLE_CHATGPT_STRATEGIC_ADVISOR = True
-    STRATEGIC_ADVISOR_MODEL = "claude-opus-4-6"
+    STRATEGIC_ADVISOR_MODEL = AI_MODEL_TOP
     
     USE_ADVISOR_FOR_POSITION_SIZING = True
     USE_ADVISOR_FOR_EXIT_STRATEGY = True
@@ -1039,7 +1042,7 @@ class Config:
     # ═══════════════════════════════════════════════════════════════════
     
     # GPT Model Selection
-    GPT_MODEL = "claude-opus-4-6"
+    GPT_MODEL = AI_MODEL_TOP
     
     # Decision #1: Entry Signal Approval (Most Critical)
     GPT_APPROVE_ENTRIES = True
@@ -2063,7 +2066,7 @@ class Config:
     # Sonnet is used for rare strategic calls (2/day: morning briefing + EOD review)
     # Haiku is used for frequent tactical gates (entry/exit approvals, ~10-20/day)
     # This delivers ~10x cost reduction vs all-Sonnet.
-    PH9_MODEL_SONNET = "claude-sonnet-4-6"        # Strategic reasoning (morning/EOD)
+    PH9_MODEL_SONNET = AI_MODEL_TOP                # Strategic reasoning (morning/EOD) — now the top model
     PH9_MODEL_HAIKU  = "claude-haiku-4-5-20251001" # Tactical gates (entry/exit)
     PH9_MODEL = PH9_MODEL_SONNET                   # Back-compat alias
     PH9_API_KEY_ENV_VAR = "ANTHROPIC_API_KEY"      # Env var for API key

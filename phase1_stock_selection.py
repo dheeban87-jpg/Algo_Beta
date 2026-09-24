@@ -403,7 +403,7 @@ class Config:
     #   Phase 4 (Exit): gpt-4o-mini (Future) - $5.31/week
     #   Total monthly cost: ~$13/month (~₹1,075)
     
-    AI_MODEL = "claude-opus-4-6"  # ⭐ PREMIUM MODEL - Best for weekly planning
+    AI_MODEL = "claude-fable-5-1"  # ⭐ TOP MODEL - Best for weekly planning
     # Cost: $5.00/1M input, $25.00/1M output
     # Why: Important for week-ahead strategy, very low frequency (1x/week)
     

@@ -1993,16 +1993,159 @@ class Phase6OptionsAdvisor:
             return None
 
         plan = self._design_marker_strategy(sig, chain)
+
+        ai = None
+        if self.chatgpt and getattr(self.config, 'MARKER_AI_ENABLED', True):
+            ai = self._marker_ai_review(sig, chain, plan, dte_note)
+        if ai:
+            if ai['verdict'] != 'ENTER':
+                self._marker_notify(self._format_marker_ai_pass(sig, ai))
+                return None
+            ai_plan = self._plan_from_ai(sig, chain, ai, plan, dte_note)
+            self.marker_suggestions = getattr(self, 'marker_suggestions', []) + [ai_plan]
+            self._marker_notify(self._format_marker_ai_suggestion(ai_plan, plan))
+            return ai_plan
+
         if not plan:
             self._marker_notify(f"📍 {symbol}: 2nd-dip seen but no liquid strikes fit the setup.")
             return None
-        plan['dte_note'] = dte_note
+        plan['dte_note'] = dte_note + " | rule-based (AI unavailable)"
 
         if not hasattr(self, 'marker_suggestions'):
             self.marker_suggestions = []
         self.marker_suggestions.append(plan)
         self._marker_notify(self._format_marker_suggestion(plan))
         return plan
+
+    # ── AI expert review (validated; the AI can never invent strikes/symbols) ──
+
+    def _marker_ai_review(self, sig: Dict, chain, baseline: Optional[Dict], dte_note: str) -> Optional[Dict]:
+        try:
+            spot = chain.spot_price or sig['price']
+            table = sorted(chain.strikes, key=lambda x: abs(x['strike'] - spot))[:11]
+            table = sorted(table, key=lambda x: x['strike'])
+            ctx = {
+                'now': datetime.now().strftime('%Y-%m-%d %H:%M (IST)'),
+                'stock': sig['symbol'], 'spot': spot,
+                'marker_entry_price': sig.get('entry_price'),
+                'signal': {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in sig.items()},
+                'expiry': chain.expiry, 'days_to_expiry': (chain.expiry_dt - date.today()).days if chain.expiry_dt else None,
+                'dte_gate': dte_note, 'lot_size': chain.lot_size, 'max_lots_allowed': 1,
+                'pcr': chain.pcr, 'max_pain': chain.max_pain, 'oi_buildup': chain.oi_buildup,
+                'strikes': [{k: x.get(k) for k in ('strike', 'ce_symbol', 'ce_ltp', 'ce_oi', 'ce_volume', 'pe_ltp', 'pe_oi', 'pe_volume')} for x in table],
+                'rule_based_reference_plan': ({
+                    'type': baseline['primary']['type'], 'label': baseline['primary']['label'],
+                    't1': baseline['t1'], 't2': baseline['t2'], 'stop_underlying': baseline['stop_underlying'],
+                    'est_rr': round(baseline['primary']['rr'], 2)} if baseline else None),
+                'account': 'small retail account, manual execution, paper-tracking phase',
+            }
+            raw = self.chatgpt.review_marker_second_dip(ctx)
+        except Exception as e:
+            logger.error(f"   Marker AI review error: {e}")
+            return None
+        if not raw:
+            return None
+
+        verdict = str(raw.get('verdict', '')).upper()
+        if verdict not in ('ENTER', 'WAIT', 'SKIP'):
+            logger.warning(f"   Marker AI: bad verdict {verdict!r} — using rules")
+            return None
+        raw['verdict'] = verdict
+        if verdict != 'ENTER':
+            return raw
+
+        by_symbol = {x.get('ce_symbol'): x for x in chain.strikes if x.get('ce_symbol')}
+        legs = raw.get('legs') or []
+        good = []
+        for leg in legs:
+            row = by_symbol.get(leg.get('symbol'))
+            action = str(leg.get('action', '')).upper()
+            if not row or action not in ('BUY', 'SELL') or row.get('ce_ltp', 0) <= 0:
+                logger.warning(f"   Marker AI: leg rejected (not in chain / bad action): {leg}")
+                return None
+            good.append({'action': action, 'symbol': leg['symbol'], 'strike': row['strike'], 'premium': row['ce_ltp']})
+        kind = str(raw.get('strategy', '')).upper()
+        buys = [l for l in good if l['action'] == 'BUY']
+        sells = [l for l in good if l['action'] == 'SELL']
+        if kind == 'LONG_CALL' and len(good) == 1 and len(buys) == 1:
+            pass
+        elif kind == 'BULL_CALL_SPREAD' and len(buys) == 1 and len(sells) == 1 and sells[0]['strike'] > buys[0]['strike']:
+            pass
+        else:
+            logger.warning(f"   Marker AI: strategy/legs inconsistent ({kind}, {len(good)} legs) — using rules")
+            return None
+        raw['legs'] = good
+        raw['strategy'] = kind
+        return raw
+
+    def _plan_from_ai(self, sig: Dict, chain, ai: Dict, baseline: Optional[Dict], dte_note: str) -> Dict:
+        spot = chain.spot_price or sig['price']
+        lot = chain.lot_size or 1
+
+        def num(v, default):
+            try:
+                v = float(v)
+                return v if v > 0 else default
+            except (TypeError, ValueError):
+                return default
+
+        d_t1 = baseline['t1'] if baseline else round(max(sig['peak_price'], spot * 1.01), 2)
+        d_t2 = baseline['t2'] if baseline else round(d_t1 * 1.01, 2)
+        t1, t2 = num(ai.get('t1'), d_t1), num(ai.get('t2'), d_t2)
+        stop_u = num(ai.get('stop_underlying'), sig['structural_stop'])
+        if not (stop_u < spot < t1 <= t2):
+            t1, t2, stop_u = d_t1, d_t2, sig['structural_stop']
+        buys = [l for l in ai['legs'] if l['action'] == 'BUY']
+        sells = [l for l in ai['legs'] if l['action'] == 'SELL']
+        net = buys[0]['premium'] - (sells[0]['premium'] if sells else 0)
+        return {
+            'symbol': sig['symbol'], 'time': datetime.now().isoformat(), 'source': 'AI',
+            'spot': spot, 'expiry': chain.expiry, 'lot_size': lot, 'pcr': chain.pcr, 'max_pain': chain.max_pain,
+            't1': round(t1, 2), 't2': round(t2, 2), 'stop_underlying': round(stop_u, 2),
+            'net_premium': round(net, 2), 'cost': round(net * lot, 2),
+            'premium_stop': num(ai.get('premium_stop'), round(net * 0.65, 2)),
+            'dte_note': dte_note, 'ai': ai, 'signal': sig,
+        }
+
+    def _format_marker_ai_pass(self, sig: Dict, ai: Dict) -> str:
+        from html import escape as e
+        sc = "\n".join(f" • {e(str(x.get('name', '')))} {x.get('probability_pct', '?')}%" for x in ai.get('scenarios', [])[:4])
+        return (f"🧭 2ND DIP — {sig['symbol']}: AI says {ai['verdict']} (conf {ai.get('confidence', '?')})\n"
+                f"{'=' * 30}\n{e(str(ai.get('reasoning', '')))}\n\n"
+                f"Scenarios:\n{sc}\n\nMost likely way it loses: {e(str(ai.get('pre_mortem', '')))}\n"
+                f"⚠️ Suggestion only — no options entry advised right now")
+
+    def _format_marker_ai_suggestion(self, p: Dict, baseline: Optional[Dict]) -> str:
+        from html import escape as e
+        ai = p['ai']
+        legs = "\n".join(f"   {l['action']} {l['symbol']} @ ₹{l['premium']:.2f}" for l in ai['legs'])
+        sc = "\n".join(f" • {e(str(x.get('name', '')))} — {x.get('probability_pct', '?')}%: "
+                       f"{e(str(x.get('underlying', '')))} → {e(str(x.get('option_result', '')))}"
+                       for x in ai.get('scenarios', [])[:4])
+        zone = ai.get('entry_zone') or {}
+        zone_txt = (f"₹{zone['underlying_min']:.2f}–₹{zone['underlying_max']:.2f}"
+                    if isinstance(zone.get('underlying_min'), (int, float)) and isinstance(zone.get('underlying_max'), (int, float)) else "current level")
+        loss_note = "max loss = cost" if ai['strategy'] in ('LONG_CALL', 'BULL_CALL_SPREAD') else ""
+        return (
+            f"💡 OPTIONS SUGGESTION (AI expert) — {p['symbol']} (2nd dip)\n"
+            f"{'=' * 32}\n⚠️ SUGGESTION ONLY — enter manually\n\n"
+            f"Verdict: ENTER | Confidence {ai.get('confidence', '?')}\n"
+            f"Spot ₹{p['spot']:.2f} | Expiry {p['expiry']} {e(p.get('dte_note', ''))}\n"
+            f"Lot {p['lot_size']} | PCR {p['pcr']:.2f} | Max pain ₹{p['max_pain']:.0f}\n\n"
+            f"▶ {ai['strategy'].replace('_', ' ')}\n{legs}\n"
+            f"   Cost/lot: ₹{p['cost']:,.0f} ({loss_note})\n\n"
+            f"🎲 Scenarios:\n{sc}\n"
+            f"EV: {e(str(ai.get('expected_value', 'n/a')))}\n\n"
+            f"📐 Plan (underlying):\n"
+            f"   Entry zone {zone_txt}\n"
+            f"   T1 ₹{p['t1']:.2f} → book 50% | T2 ₹{p['t2']:.2f} → trail\n"
+            f"   Invalidation: close below ₹{p['stop_underlying']:.2f} | premium stop ₹{p['premium_stop']:.2f}\n"
+            f"   Time stop: {ai.get('time_stop_sessions', 2)} sessions\n\n"
+            f"☠️ Pre-mortem: {e(str(ai.get('pre_mortem', '')))}\n"
+            f"🧭 Manage: {e(str(ai.get('manage_plan', '')))}\n\n"
+            f"Why: {e(str(ai.get('reasoning', '')))}\n\n"
+            f"After entering, send /opt to track it."
+        )
 
     def _design_marker_strategy(self, sig: Dict, chain) -> Optional[Dict]:
         spot = chain.spot_price or sig['price']
