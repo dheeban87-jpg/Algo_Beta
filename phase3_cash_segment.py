@@ -1547,6 +1547,12 @@ class Phase3CashSegmentExecutor:
                     logger.info(f"   ⚠️ Gate error fallback: size reduced {old_qty} → {quantity} (0.5x)")
                 cost = stock_ltp * quantity
 
+        _marker_mode = getattr(self.config, 'MARKER_MODE_ENABLED', False)
+        if _marker_mode:
+            quantity = int(getattr(self.config, 'MARKER_QUANTITY', 1))
+            cost = stock_ltp * quantity
+            logger.info(f"   📍 MARKER MODE: quantity forced to {quantity} share(s) (₹{cost:,.2f})")
+
         # Step 4: Place BUY order (v5.4: LIMIT if ChatGPT suggests entry price)
         logger.info(f"📤 Placing BUY order...")
 
@@ -1926,6 +1932,16 @@ class Phase3CashSegmentExecutor:
             if round_below > 0 and round_above > 0:
                 logger.info(f"   📊 Round numbers: ₹{round_below:.0f} (below) ₹{round_above:.0f} (above)")
 
+        if _marker_mode:
+            stop_pct = float(getattr(self.config, 'MARKER_DISASTER_STOP_PCT', 8.0))
+            target_pct = float(getattr(self.config, 'MARKER_TARGET_PCT', 25.0))
+            stop_price = round(fill_price * (1 - stop_pct / 100), 2)
+            target_price = round(fill_price * (1 + target_pct / 100), 2)
+            price_level_stop_used = False
+            price_level_target_used = False
+            logger.info(f"   📍 MARKER MODE: disaster stop ₹{stop_price:.2f} (-{stop_pct:.1f}%), "
+                        f"far target ₹{target_price:.2f} (+{target_pct:.1f}%)")
+
         # Volatility-adjusted position size (from AI)
         position_multiplier = signal.get('position_size_multiplier', 1.0)
         volatility_regime = signal.get('volatility_regime', 'MEDIUM')
@@ -1984,8 +2000,13 @@ class Phase3CashSegmentExecutor:
             # v4.5.2: GTT protection tracking (set after GTT placement)
             'gtt_protected': False,  # Will be set True if GTT stop placed successfully
             
+            # MARKER positions are routed to Phase 4's marker pipeline (sensor-only, no quick exits)
+            'strategy_mode': 'MARKER' if _marker_mode else 'STANDARD',
+            'marker_low_since_entry': fill_price,
+            'second_dip_signaled': False,
+
             # v5.3.3: Smart TCAS for CNC (same design philosophy as Phase 5 MIS)
-            'smart_tcas_enabled': True,
+            'smart_tcas_enabled': not _marker_mode,
             'tcas_activation_pct': getattr(self.config, 'CNC_TCAS_ACTIVATION_PCT', 0.7),
             'tcas_activation_price': fill_price * (1 + getattr(self.config, 'CNC_TCAS_ACTIVATION_PCT', 0.7) / 100),
             'tcas_trail_pct': getattr(self.config, 'CNC_TCAS_TRAIL_PCT', 0.5),
@@ -2065,7 +2086,9 @@ class Phase3CashSegmentExecutor:
         # v6.0: Phase 6 Options Advisory (Paper Trade)
         # Generate Bull Call Spread recommendation for this stock
         # ═══════════════════════════════════════════════════════════════════
-        if self.options_advisor and getattr(self.config, 'PH6_OPTIONS_ADVISORY_ENABLED', False):
+        if _marker_mode:
+            logger.info(f"   📍 MARKER MODE: options advisory deferred to 2nd-dip signal from Phase 4")
+        elif self.options_advisor and getattr(self.config, 'PH6_OPTIONS_ADVISORY_ENABLED', False):
             try:
                 options_advisory = self.options_advisor.generate_advisory(
                     symbol=symbol,

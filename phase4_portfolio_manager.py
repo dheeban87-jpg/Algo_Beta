@@ -1579,6 +1579,10 @@ class Phase4PortfolioManager:
         self.phase6 = None
         self.tcas_pivot_early_signaled: set = set()  # ISSUE-15: symbols that got early Phase 6 warning
 
+        # MARKER strategy: 1-share radar positions get their own sensor-only pipeline
+        from marker_monitor import MarkerMonitor
+        self.marker_monitor = MarkerMonitor(kite, config, telegram)
+
         # ═══════════════════════════════════════════════════════════════════
         # v1.1.0 NEW: Capital Manager Integration
         # ═══════════════════════════════════════════════════════════════════
@@ -4147,7 +4151,7 @@ class Phase4PortfolioManager:
 
         # v1.4.0: Apply Phase 9 morning briefing stop/target/exit multipliers
         _briefing = getattr(self, 'daily_briefing', {})
-        if _briefing and _briefing.get('briefing_done'):
+        if _briefing and _briefing.get('briefing_done') and not self._is_marker(position):
             try:
                 _entry  = float(position.get('entry_price', 0) or 0)
                 _stop   = float(position.get('stop_price', 0) or 0)
@@ -4247,6 +4251,8 @@ class Phase4PortfolioManager:
             return
         adjusted = 0
         for symbol, pos in self.positions.items():
+            if self._is_marker(pos):
+                continue
             try:
                 _entry  = float(pos.get('entry_price', 0) or 0)
                 _cur    = float(pos.get('current_price', _entry) or _entry)
@@ -4520,6 +4526,8 @@ class Phase4PortfolioManager:
             worst_pnl  = float('inf')
 
             for sym, pos in self.positions.items():
+                if self._is_marker(pos):
+                    continue
                 _entry = float(pos.get('entry_price', 0) or 0)
                 _cur   = float(pos.get('current_price', _entry) or _entry)
                 _is_long = str(pos.get('direction', 'LONG')).upper() in ('LONG', 'BUY')
@@ -9093,7 +9101,14 @@ class Phase4PortfolioManager:
         tier1_symbols = set(self._get_tier1_positions().keys())
         tier3_symbols = set(self._get_tier3_positions().keys())
         return {s: p for s, p in self.positions.items()
-                if s not in tier1_symbols and s not in tier3_symbols}
+                if s not in tier1_symbols and s not in tier3_symbols and not self._is_marker(p)}
+
+    @staticmethod
+    def _is_marker(position: dict) -> bool:
+        return position.get('strategy_mode') == 'MARKER'
+
+    def _get_marker_positions(self) -> dict:
+        return {s: p for s, p in self.positions.items() if self._is_marker(p)}
 
     # ═══════════════════════════════════════════════════════════════════════
     # v8.0.0: TIER 3 — PHASE 8 WEEKLY MOMENTUM POSITIONS
@@ -10983,10 +10998,33 @@ GUIDELINES:
                 continue
         
         # ═══════════════════════════════════════════════════════════════════
+        # STEP 4M: MARKER positions — sensor only (2nd-dip → Phase 6), disaster stop exit
+        # ═══════════════════════════════════════════════════════════════════
+        self.marker_monitor.phase6 = self.phase6
+        for symbol, position in self._get_marker_positions().items():
+            quote_data = quotes.get(f"NSE:{symbol}", {})
+            current_price = quote_data.get('last_price', 0)
+            if current_price <= 0:
+                continue
+            self._update_position(symbol, position, current_price=current_price,
+                                  max_price=max(position.get('max_price', current_price), current_price))
+            try:
+                action = self.marker_monitor.on_price(symbol, position, current_price,
+                                                      quote_data.get('volume', 0))
+            except Exception as e:
+                logger.error(f"   📍 Marker monitor error for {symbol}: {e}")
+                continue
+            if action == 'DISASTER_EXIT':
+                logger.warning(f"📍🛑 MARKER DISASTER STOP: {symbol} @ ₹{current_price:.2f} "
+                               f"(stop ₹{position.get('stop_price', 0):.2f})")
+                if self._execute_exit(symbol, ExitReason.STOP_LOSS.value):
+                    self.marker_monitor.forget(symbol)
+
+        # ═══════════════════════════════════════════════════════════════════
         # STEP 4B: TIER 2 — Full pipeline for CNC/swing positions
         # Kalman → TCAS → ILS → Health → ChatGPT → Trailing Stop
         # ═══════════════════════════════════════════════════════════════════
-        
+
         chatgpt_queue = []  # Queue positions needing ChatGPT
         
         for symbol in list(tier2_positions.keys()):
@@ -11657,6 +11695,8 @@ GUIDELINES:
         logger.info("🛬 Running Landing Probability Analysis...")
         
         for symbol, position in list(self.positions.items()):
+            if self._is_marker(position):
+                continue
             # Build analysis data
             current_price = position.get('current_price', 0)
             target_price = position.get('target_price', 0)

@@ -20,6 +20,8 @@ import json
 import time
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -1956,6 +1958,314 @@ class Phase6OptionsAdvisor:
     # ChatGPT approval (score > 70). The cash trade is already executed.
     # ChatGPT only decides whether to paper-shadow with a CE option.
     # ═══════════════════════════════════════════════════════════════════════
+
+    # ───────────────────────────────────────────────────────────────
+    # MARKER STRATEGY: 2nd-dip options SUGGESTION (never places orders)
+    # ───────────────────────────────────────────────────────────────
+
+    def on_marker_second_dip(self, sig: Dict) -> Optional[Dict]:
+        """Build a manual-entry options suggestion from a Phase 4 marker 2nd-dip signal."""
+        symbol = sig['symbol']
+        logger.info(f"📍 PHASE 6: MARKER 2ND-DIP SUGGESTION for {symbol}")
+
+        if self._is_nfo_cache_stale():
+            self._load_nfo_instruments()
+        if symbol not in self._fno_stock_set:
+            logger.info(f"   {symbol} has no F&O — no options suggestion")
+            return None
+
+        expiry = self._get_nearest_expiry(symbol)
+        dte_note = ""
+        override = None
+        if expiry:
+            dte_check = self._check_dte_eligibility(expiry)
+            if not dte_check['eligible']:
+                self._marker_notify(f"📍 {symbol}: 2nd-dip seen but no safe expiry "
+                                    f"({dte_check['reason']}). No options suggestion.")
+                return None
+            if dte_check['rolled']:
+                override = dte_check['expiry_date']
+            dte_note = f"{dte_check['action']} (DTE {dte_check['dte']})"
+
+        chain = self._build_options_chain(symbol, override_expiry=override)
+        if not chain or not chain.strikes:
+            self._marker_notify(f"📍 {symbol}: 2nd-dip seen but options chain unavailable.")
+            return None
+
+        plan = self._design_marker_strategy(sig, chain)
+        if not plan:
+            self._marker_notify(f"📍 {symbol}: 2nd-dip seen but no liquid strikes fit the setup.")
+            return None
+        plan['dte_note'] = dte_note
+
+        if not hasattr(self, 'marker_suggestions'):
+            self.marker_suggestions = []
+        self.marker_suggestions.append(plan)
+        self._marker_notify(self._format_marker_suggestion(plan))
+        return plan
+
+    def _design_marker_strategy(self, sig: Dict, chain) -> Optional[Dict]:
+        spot = chain.spot_price or sig['price']
+        stop_u = sig['structural_stop']
+        t1 = max(sig['peak_price'], spot * 1.01)
+        t2 = t1 + 0.5 * (sig['peak_price'] - sig['dip_low'])
+        lot = chain.lot_size or 1
+        dte = (chain.expiry_dt - date.today()).days if chain.expiry_dt else 10
+
+        calls = [s for s in chain.strikes if s.get('ce_ltp', 0) > 0 and s.get('ce_symbol')]
+        if not calls:
+            return None
+        step = min((b['strike'] - a['strike'] for a, b in zip(calls, calls[1:])), default=spot * 0.01) or spot * 0.01
+        atm = min(calls, key=lambda s: abs(s['strike'] - spot))
+        itm = max((s for s in calls if s['strike'] <= spot - 0.5 * step), key=lambda s: s['strike'], default=atm)
+
+        def call_value(k, s_price, prem_now, days_left):
+            intrinsic_now = max(spot - k, 0)
+            tv_now = max(prem_now - intrinsic_now, 0)
+            decay = max(0.0, 1 - 2 / max(days_left, 1))   # ~2 sessions of theta used
+            return max(s_price - k, 0) + tv_now * decay
+
+        candidates = []
+        for leg in {atm['strike']: atm, itm['strike']: itm}.values():
+            prem = leg['ce_ltp']
+            v1 = call_value(leg['strike'], t1, prem, dte)
+            vs = call_value(leg['strike'], stop_u, prem, dte)
+            gain, loss = (v1 - prem) * lot, max(prem - vs, prem * 0.3) * lot
+            candidates.append({
+                'type': 'LONG_CALL', 'label': f"Buy {leg['ce_symbol']}",
+                'legs': [{'action': 'BUY', 'symbol': leg['ce_symbol'], 'strike': leg['strike'], 'premium': prem}],
+                'cost': prem * lot, 'gain_t1': gain, 'loss_stop': loss,
+                'rr': gain / loss if loss > 0 else 0,
+                'premium_stop': round(prem - loss / lot, 2),
+            })
+
+        sell = min((s for s in calls if s['strike'] >= t1 - 0.25 * step), key=lambda s: s['strike'], default=None)
+        if sell and sell['strike'] > atm['strike']:
+            debit = atm['ce_ltp'] - sell['ce_ltp']
+            width = sell['strike'] - atm['strike']
+            if debit > 0:
+                v1 = min(max(t1 - atm['strike'], 0), width)
+                gain = (v1 - debit) * lot * 0.85   # spreads rarely reach full value before expiry
+                loss = debit * lot * 0.6
+                candidates.append({
+                    'type': 'BULL_CALL_SPREAD',
+                    'label': f"Buy {atm['ce_symbol']} / Sell {sell['ce_symbol']}",
+                    'legs': [{'action': 'BUY', 'symbol': atm['ce_symbol'], 'strike': atm['strike'], 'premium': atm['ce_ltp']},
+                             {'action': 'SELL', 'symbol': sell['ce_symbol'], 'strike': sell['strike'], 'premium': sell['ce_ltp']}],
+                    'cost': debit * lot, 'gain_t1': gain, 'loss_stop': loss,
+                    'rr': gain / loss if loss > 0 else 0,
+                    'max_profit': (width - debit) * lot, 'premium_stop': round(debit * 0.4, 2),
+                })
+
+        # Short DTE → theta hurts naked calls; prefer the spread
+        for c in candidates:
+            c['score'] = c['rr'] * (0.7 if (c['type'] == 'LONG_CALL' and dte < 8) else 1.0)
+        candidates.sort(key=lambda c: c['score'], reverse=True)
+        best = candidates[0]
+        return {
+            'symbol': sig['symbol'], 'time': datetime.now().isoformat(),
+            'spot': spot, 'expiry': chain.expiry, 'dte': dte, 'lot_size': lot,
+            'stop_underlying': stop_u, 't1': round(t1, 2), 't2': round(t2, 2),
+            'pcr': chain.pcr, 'max_pain': chain.max_pain,
+            'primary': best, 'alternatives': candidates[1:3], 'signal': sig,
+        }
+
+    def _format_marker_suggestion(self, p: Dict) -> str:
+        b = p['primary']
+        legs = "\n".join(f"   {l['action']} {l['symbol']} @ ₹{l['premium']:.2f}" for l in b['legs'])
+        alts = "\n".join(f" • {a['type']}: {a['label']} (cost ₹{a['cost']:,.0f}, R:R {a['rr']:.1f})"
+                         for a in p['alternatives']) or " • none"
+        return (
+            f"💡 OPTIONS SUGGESTION — {p['symbol']} (2nd dip)\n"
+            f"{'=' * 32}\n"
+            f"⚠️ SUGGESTION ONLY — enter manually\n\n"
+            f"Spot ₹{p['spot']:.2f} | Expiry {p['expiry']} {p.get('dte_note', '')}\n"
+            f"Lot {p['lot_size']} | PCR {p['pcr']:.2f} | Max pain ₹{p['max_pain']:.0f}\n\n"
+            f"▶ {b['type'].replace('_', ' ')}\n{legs}\n"
+            f"   Cost/lot: ₹{b['cost']:,.0f}\n"
+            f"   Est. gain at T1: ₹{b['gain_t1']:,.0f} | Est. loss at stop: ₹{b['loss_stop']:,.0f} "
+            f"(R:R {b['rr']:.1f})\n\n"
+            f"📐 Plan (underlying):\n"
+            f"   T1 ₹{p['t1']:.2f} (retest peak) → book 50%\n"
+            f"   T2 ₹{p['t2']:.2f} → trail the rest\n"
+            f"   Stop: close below ₹{p['stop_underlying']:.2f} (dip low) or premium ≤ ₹{b['premium_stop']:.2f}\n"
+            f"   Time stop: exit if no move in 2 sessions\n\n"
+            f"Alternatives:\n{alts}\n\n"
+            f"After entering, send /opt to track it."
+        )
+
+    # ───────────────────────────────────────────────────────────────
+    # MANUAL OPTIONS TRADE TRACKER (/opt) — suggestions only
+    # ───────────────────────────────────────────────────────────────
+
+    _MANUAL_FILE = 'data/manual_options.json'
+
+    def _manual_load(self) -> List[Dict]:
+        if not hasattr(self, '_manual_trades'):
+            try:
+                with open(self._MANUAL_FILE) as fh:
+                    self._manual_trades = json.load(fh)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self._manual_trades = []
+        return self._manual_trades
+
+    def _manual_save(self):
+        with open(self._MANUAL_FILE, 'w') as fh:
+            json.dump(self._manual_trades, fh, indent=2, default=str)
+
+    def manual_trades_open(self) -> bool:
+        return any(t['status'] == 'OPEN' for t in self._manual_load())
+
+    def handle_opt_command(self, args: List[str]) -> str:
+        trades = self._manual_load()
+        usage = ("Usage:\n/opt SYMBOL STRIKE CE|PE PREMIUM [LOTS]\n"
+                 "  e.g. /opt RELIANCE 2900 CE 42.5 1\n/opt list\n/opt close ID [EXIT_PREMIUM]")
+        if not args or args[0].lower() == 'list':
+            open_t = [t for t in trades if t['status'] == 'OPEN']
+            if not open_t:
+                return "No open manual options trades.\n\n" + usage
+            return "📒 OPEN OPTIONS TRADES\n" + "\n".join(
+                f"#{t['id']} {t['tradingsymbol']} x{t['lots']} lot | entry ₹{t['entry_premium']:.2f} "
+                f"| last ₹{t.get('last_premium', 0):.2f} ({t.get('pnl_pct', 0):+.1f}%)" for t in open_t)
+
+        if args[0].lower() == 'close':
+            try:
+                tid = int(args[1])
+            except (IndexError, ValueError):
+                return usage
+            t = next((x for x in trades if x['id'] == tid and x['status'] == 'OPEN'), None)
+            if not t:
+                return f"No open trade #{tid}."
+            exit_p = float(args[2]) if len(args) > 2 else t.get('last_premium', 0)
+            t.update(status='CLOSED', exit_premium=exit_p, exit_time=datetime.now().isoformat(),
+                     realized_pnl=round((exit_p - t['entry_premium']) * t['lots'] * t['lot_size'], 2))
+            self._manual_save()
+            return f"✅ Closed #{tid} {t['tradingsymbol']} @ ₹{exit_p:.2f} | P&L ₹{t['realized_pnl']:+,.0f}"
+
+        try:
+            symbol, strike, opt_type, premium = args[0].upper(), float(args[1]), args[2].upper(), float(args[3])
+            lots = int(args[4]) if len(args) > 4 else 1
+        except (IndexError, ValueError):
+            return usage
+        if opt_type not in ('CE', 'PE'):
+            return usage
+        if self._is_nfo_cache_stale():
+            self._load_nfo_instruments()
+
+        plan = next((p for p in reversed(getattr(self, 'marker_suggestions', [])) if p['symbol'] == symbol), None)
+        today = date.today()
+        matches = []
+        for inst in self._nfo_instruments:
+            if inst.get('name') != symbol or inst.get('instrument_type') != opt_type:
+                continue
+            if abs(float(inst.get('strike', 0)) - strike) > 1e-6:
+                continue
+            exp = inst.get('expiry')
+            exp = exp.date() if isinstance(exp, datetime) else exp
+            if exp and exp >= today:
+                matches.append((exp, inst))
+        if not matches:
+            return f"❌ No {symbol} {strike:g} {opt_type} contract found."
+        matches.sort(key=lambda m: m[0])
+        exp, inst = matches[0]
+        if plan:
+            same = [m for m in matches if str(m[0]) == str(plan['expiry'])]
+            if same:
+                exp, inst = same[0]
+
+        default_stop = round(premium * 0.65, 2)
+        trade = {
+            'id': max((t['id'] for t in trades), default=0) + 1,
+            'symbol': symbol, 'tradingsymbol': inst['tradingsymbol'], 'strike': strike,
+            'type': opt_type, 'expiry': str(exp), 'lot_size': int(inst.get('lot_size', 1)),
+            'lots': lots, 'entry_premium': premium, 'entry_time': datetime.now().isoformat(),
+            'status': 'OPEN', 'peak_premium': premium, 'alerts': [],
+            't1': plan['t1'] if plan else None, 't2': plan['t2'] if plan else None,
+            'stop_underlying': plan['stop_underlying'] if plan else None,
+            'premium_stop': default_stop, 'booked_half': False,
+        }
+        trades.append(trade)
+        self._manual_save()
+        plan_txt = (f"T1 ₹{trade['t1']:.2f} | T2 ₹{trade['t2']:.2f} | Stop (spot) ₹{trade['stop_underlying']:.2f}"
+                    if plan else "No 2nd-dip plan found — using premium rules (+40% book half, −35% stop)")
+        return (f"📒 Tracking #{trade['id']} {trade['tradingsymbol']} x{lots} lot "
+                f"(lot {trade['lot_size']}) @ ₹{premium:.2f}\n{plan_txt}\n"
+                f"Premium stop ₹{default_stop:.2f}\nI'll send exit/profit suggestions. /opt close {trade['id']} when done.")
+
+    def check_manual_trades(self):
+        trades = [t for t in self._manual_load() if t['status'] == 'OPEN']
+        if not trades:
+            return
+        keys = [f"NFO:{t['tradingsymbol']}" for t in trades] + list({f"NSE:{t['symbol']}" for t in trades})
+        try:
+            q = self.kite.ltp(keys)
+        except Exception as e:
+            logger.warning(f"Manual options LTP failed: {e}")
+            return
+        for t in trades:
+            prem = q.get(f"NFO:{t['tradingsymbol']}", {}).get('last_price', 0)
+            spot = q.get(f"NSE:{t['symbol']}", {}).get('last_price', 0)
+            if prem <= 0:
+                continue
+            for msg in self._manual_trade_advice(t, prem, spot):
+                self._marker_notify(msg)
+        self._manual_save()
+
+    def _manual_trade_advice(self, t: Dict, prem: float, spot: float) -> List[str]:
+        entry = t['entry_premium']
+        t['last_premium'] = prem
+        t['pnl_pct'] = round((prem / entry - 1) * 100, 1)
+        t['peak_premium'] = max(t['peak_premium'], prem)
+        pnl_rs = (prem - entry) * t['lots'] * t['lot_size']
+        head = f"{t['tradingsymbol']} #{t['id']} | ₹{entry:.2f} → ₹{prem:.2f} ({t['pnl_pct']:+.1f}%, ₹{pnl_rs:+,.0f})"
+        out = []
+
+        def once(key, text):
+            if key not in t['alerts']:
+                t['alerts'].append(key)
+                out.append(text)
+
+        is_call = t['type'] == 'CE'
+        spot_stop_hit = t.get('stop_underlying') and spot and (
+            spot <= t['stop_underlying'] if is_call else spot >= t['stop_underlying'])
+        if spot_stop_hit or prem <= t['premium_stop']:
+            why = ("Trailing stop hit — lock the remaining profit." if t['booked_half']
+                   else "Setup failed; protect capital.")
+            once('STOP', f"🛑 EXIT SUGGESTED — {head}\nStop hit (spot ₹{spot:.2f}, premium stop ₹{t['premium_stop']:.2f}). "
+                         f"{why}\n⚠️ Suggestion only")
+            return out
+
+        t1_hit = (t.get('t1') and spot and (spot >= t['t1'] if is_call else spot <= t['t1'])) or t['pnl_pct'] >= 40
+        if t1_hit and not t['booked_half']:
+            t['booked_half'] = True
+            t['premium_stop'] = max(t['premium_stop'], entry)
+            once('T1', f"🎯 BOOK 50% — {head}\nT1 reached. Book half, move stop to cost (₹{entry:.2f}). "
+                       f"Let the rest run to T2.\n⚠️ Suggestion only")
+
+        if t['booked_half']:
+            trail = round(t['peak_premium'] * 0.75, 2)
+            t['premium_stop'] = max(t['premium_stop'], trail)
+            t2_hit = t.get('t2') and spot and (spot >= t['t2'] if is_call else spot <= t['t2'])
+            if t2_hit:
+                once('T2', f"🏁 T2 REACHED — {head}\nBook the rest or trail tight (stop ₹{t['premium_stop']:.2f}).\n⚠️ Suggestion only")
+
+        held = int(np.busday_count(datetime.fromisoformat(t['entry_time']).date(), date.today()))
+        if held >= 2 and t['pnl_pct'] < 10 and not t['booked_half']:
+            once('TIME', f"⌛ TIME STOP — {head}\nNo follow-through in {held} sessions; theta is eating the premium. "
+                         f"Consider exiting.\n⚠️ Suggestion only")
+
+        dte = (date.fromisoformat(t['expiry']) - date.today()).days
+        if dte <= 3:
+            once('DTE', f"📅 EXPIRY NEAR ({dte}d) — {head}\nExit or roll; theta and delivery risk rise sharply.\n⚠️ Suggestion only")
+        return out
+
+    def _marker_notify(self, text: str):
+        logger.info(text.replace('\n', ' | '))
+        if self.telegram:
+            try:
+                self.telegram.send_message(text)
+            except Exception as e:
+                logger.warning(f"Phase 6 marker Telegram failed: {e}")
 
     def handle_momentum_fill(self, fill_data: Dict):
         """

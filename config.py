@@ -567,7 +567,7 @@ class Config:
     PH2_MIN_READINGS_BEFORE_TRIGGER = 6       # ~30 min on 5-min candles
 
     # Scoring thresholds
-    PH2_SCORE_ENTRY_MIN = 65                  # Was 65 — no entry below 75
+    PH2_SCORE_ENTRY_MIN = 45                  # 1-share marker entry: low risk, so loose gate (was 65)
     PH2_SCORE_FULL_POSITION = 70              # Score for full position (v5.4: was 80)
     PH2_SCORE_STRONG_BUY = 80                 # Score for STRONG_BUY (v5.4: was 90)
 
@@ -630,45 +630,53 @@ class Config:
     # Used by: Phase 1 (stock selection scan), Phase 5 (gap strategy scan)
     # Add/remove stocks HERE only — all phases read from this list
     # ============================================================
+    # ⚠️  UPDATED 2026-09-24: Only stocks with active NSE F&O options are kept.
+    # Strategy: V-Recovery on equity → options play on 2nd dip.
+    # 34 stocks removed (no options): LALPATHLAB, MRF, TATAMOTORS, IRCTC, ZOMATO,
+    #   ACC, IGL, LTIM, LTTS, BERGEPAINT, ABFRL, BATAINDIA, CADILAHC, CERA, GLAND,
+    #   GLAXO, HONAUT, IPCA, KAJARIACER, MCDOWELL-N, METROPOLIS, MINDTREE, NATCOPHARM,
+    #   PEL, PFIZER, PGHH, RAMCOCEM, SANOFI, STAR, SYMPHONY, SYNGENE, TORNTPOWER, WHIRLPOOL
+    # 10 liquid F&O stocks added: TVSMOTOR, FEDERALBNK, SHRIRAMFIN, MUTHOOTFIN,
+    #   POLYCAB, OFSS, JIOFIN, LICI, MAXHEALTH, OBEROIRLTY
     MASTER_STOCK_LIST = [
-        # NIFTY 50 Core (Top 50 by market cap)
+        # NIFTY 50 Core — all have options
         'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
         'HINDUNILVR', 'SBIN', 'BHARTIARTL', 'ITC', 'KOTAKBANK',
         'LT', 'AXISBANK', 'BAJFINANCE', 'ASIANPAINT', 'MARUTI',
         'TITAN', 'SUNPHARMA', 'ULTRACEMCO', 'NESTLEIND', 'WIPRO',
         'HCLTECH', 'BAJAJFINSV', 'TECHM', 'POWERGRID', 'NTPC',
-        'ONGC', 'TATAMOTORS', 'M&M', 'TATASTEEL', 'ADANIPORTS',
+        'ONGC', 'M&M', 'TATASTEEL', 'ADANIPORTS',
         'COALINDIA', 'DIVISLAB', 'HINDALCO', 'JSWSTEEL', 'GRASIM',
         'DRREDDY', 'INDUSINDBK', 'BRITANNIA', 'SHREECEM', 'APOLLOHOSP',
         'CIPLA', 'EICHERMOT', 'BPCL', 'HEROMOTOCO', 'BAJAJ-AUTO',
         'TATACONSUM', 'SBILIFE', 'PIDILITIND', 'HAVELLS', 'DABUR',
-        # NIFTY Next 50 + Liquid Mid-Caps
+        # NIFTY Next 50 + Liquid Mid-Caps — options verified
         'GODREJCP', 'ADANIENT', 'HDFCLIFE', 'ICICIGI', 'AMBUJACEM',
-        'BOSCHLTD', 'BANDHANBNK', 'BERGEPAINT', 'SIEMENS', 'INDIGO',
+        'BOSCHLTD', 'BANDHANBNK', 'SIEMENS', 'INDIGO',
         'MARICO', 'COLPAL', 'DLF', 'LUPIN', 'TORNTPHARM',
-        'ACC', 'CHOLAFIN', 'GAIL', 'VEDL', 'MCDOWELL-N',
-        'ADANIGREEN', 'SRF', 'NAUKRI', 'MOTHERSON', 'LTIM',
-        'PGHH', 'CONCOR', 'PEL', 'MPHASIS', 'GLAND',
-        'BIOCON', 'MINDTREE', 'PERSISTENT', 'COFORGE', 'LTTS',
+        'CHOLAFIN', 'GAIL', 'VEDL',
+        'ADANIGREEN', 'SRF', 'NAUKRI', 'MOTHERSON',
+        'CONCOR', 'MPHASIS',
+        'BIOCON', 'PERSISTENT', 'COFORGE',
         'HINDZINC', 'LICHSGFIN', 'IDFCFIRSTB', 'AUBANK', 'BANKBARODA',
         'PFC', 'RECLTD', 'NMDC', 'SAIL', 'JINDALSTEL',
         'TATAPOWER', 'ADANIPOWER', 'PNB', 'CANBK', 'IOC',
-        # Defence / PSU / New-Age
-        'BHEL', 'IRCTC', 'HAL', 'BEL', 'PAGEIND',
-        'ABCAPITAL', 'ABFRL', 'DMART', 'ZOMATO', 'PAYTM',
-        'NYKAA', 'TATAELXSI', 'HONAUT', 'VOLTAS', 'TORNTPOWER',
-        # High Beta / Specialty
-        'MRF', 'BATAINDIA', 'GODREJPROP', 'ASHOKLEY', 'MANAPPURAM',
-        'IGL', 'PETRONET', 'UPL', 'RAMCOCEM', 'LAURUSLABS',
-        'ALKEM', 'SYNGENE', 'AUROPHARMA', 'IPCA', 'LALPATHLAB',
-        'METROPOLIS', 'CADILAHC', 'PFIZER', 'GLAXO', 'ABBOTINDIA',
-        'SANOFI', 'NATCOPHARM', 'STAR', 'JUBLFOOD', 'TRENT',
-        'CROMPTON', 'WHIRLPOOL', 'DIXON', 'AMBER', 'CERA',
-        'KAJARIACER', 'SYMPHONY',
+        # Defence / PSU / New-Age — options verified
+        'BHEL', 'HAL', 'BEL', 'PAGEIND',
+        'ABCAPITAL', 'DMART', 'PAYTM',
+        'NYKAA', 'TATAELXSI', 'VOLTAS',
+        # High Beta / Specialty — options verified
+        'GODREJPROP', 'ASHOKLEY', 'MANAPPURAM',
+        'PETRONET', 'UPL', 'LAURUSLABS',
+        'ALKEM', 'AUROPHARMA', 'JUBLFOOD', 'TRENT',
+        'CROMPTON', 'DIXON', 'AMBER',
+        # New additions — liquid F&O stocks not previously in list
+        'TVSMOTOR', 'FEDERALBNK', 'SHRIRAMFIN', 'MUTHOOTFIN',
+        'POLYCAB', 'OFSS', 'JIOFIN', 'LICI', 'MAXHEALTH', 'OBEROIRLTY',
     ]
     
     # ============================================================
-    # ZERODHA API CREDENTIALS
+    # ZERODHA API CREDENTIALS 
     # ============================================================
     # ✅ FIX #13: Support environment variables (more secure)
     # Falls back to hardcoded values if env vars not set
@@ -697,7 +705,7 @@ class Config:
     ENABLE_AI_ANALYSIS = True
 
     # Anthropic API Key
-    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', "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")
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', "")
 
     # Kept for backward compatibility
     CHATGPT_API_KEY = ANTHROPIC_API_KEY
@@ -789,6 +797,21 @@ class Config:
     EXCHANGE = "NSE"
     PRODUCT_TYPE = "CNC"
     ORDER_TYPE = "MARKET"
+
+    # MARKER STRATEGY: buy 1 share as a radar; options are suggested on the 2nd dip
+    MARKER_MODE_ENABLED = True
+    MARKER_QUANTITY = 1
+    MARKER_DISASTER_STOP_PCT = 8.0     # only automatic exit
+    MARKER_TARGET_PCT = 25.0           # GTT target kept far so it never fires in a 5-6 day hold
+    MARKER_MAX_HOLD_DAYS = 6
+    # 2nd-dip sensor (5-min bars, Kalman values normalised as % of price)
+    MARKER_DIP_MIN_PCT = 3.0           # dip from post-entry peak (sim-tuned 2026-09-24)
+    MARKER_CONFIRM_BOUNCE_PCT = 0.4    # close must be this far above the dip low
+    MARKER_BOTTOM_FRESH_BARS = 12      # low must be within the last hour
+    MARKER_USE_KALMAN = True
+    MARKER_KALMAN_ACCEL_MIN = 0.001    # %/bar² — fall decelerating
+    MARKER_KALMAN_VEL_MIN = -0.02      # %/bar — fall nearly stopped
+    MANUAL_OPT_CHECK_INTERVAL_SEC = 120
     
     # ═══════════════════════════════════════════════════════════════════
     # ✅ FIX #3: DEPRECATED SETTINGS REMOVED

@@ -399,7 +399,6 @@ Focus on:
                 model="claude-opus-4-6",
                 system="You are a professional Indian stock market analyst specializing in NSE intraday trading. Provide concise, actionable analysis in JSON format.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=600
             )
 

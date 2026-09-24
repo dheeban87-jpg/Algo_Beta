@@ -344,9 +344,9 @@ USE_EMOJIS = platform.system() != 'Windows'
 class Config:
     """Configuration for Phase 1"""
     
-    # Price filter
-    PRICE_MIN = 900  # Your preferred minimum
-    PRICE_MAX = 1800  # Your preferred maximum
+    # Price filter — sweet spot for high-demand, high-velocity stocks (short 5-6 day peaks)
+    PRICE_MIN = 900
+    PRICE_MAX = 3500
     
     # Support-Bounce thresholds (Filter 2)
     SUPPORT_BOUNCE_MIN_QUALITY = 7  # Minimum quality score (0-10)
@@ -3567,19 +3567,15 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
         logger.info("")
         logger.info("⚠️  UPDATED: Relaxed filters for SELECTION (strict filters in Phase 2)")
         logger.info("")
-        logger.info("4-Filter System (Selection):")
+        logger.info("V-RECOVERY FIRST Filter System (v5.7.0):")
         logger.info(f"  1. Price Range: ₹{self.config.PRICE_MIN} - ₹{self.config.PRICE_MAX}")
-        logger.info(f"  2. Uptrend: EMA21 slope +, (MA20 trending OR Price respect), Price>MA20")
-        logger.info(f"  3. RSI Oversold: RSI 25-45 AND RSI FALLING (stocks getting hammered)")
-        logger.info(f"  4. Support Nearby: Has support within 5% (relaxed from Quality ≥7)")
-        logger.info("")
-        logger.info("MIRROR LOGIC:")
-        logger.info("  • Selection: RSI falling (40→30) = Getting hammered NOW ⬇️")
-        logger.info("  • Entry: RSI rising (30→40) = Bouncing NOW ⬆️")
-        logger.info("")
-        logger.info("REMOVED from Phase 1 (moved to Phase 2 Entry):")
-        logger.info("  ✗ Support-Bounce Quality ≥7 (too strict for selection)")
-        logger.info("  ✗ V-Recovery same day (wrong day - check Wednesday instead)")
+        logger.info(f"  1b. V-RECOVERY EARLY CHECK (PRIMARY SIGNAL — runs before secondary filters!)")
+        logger.info(f"      V-Recovery → bypasses sector + weekly EMA (uptrend still required)")
+        logger.info(f"      no pattern → all secondary filters apply as normal")
+        logger.info(f"  2. Uptrend: EMA21 slope (always required)")
+        logger.info(f"  2B. Sector: healthy sector (skipped on any V-Recovery)")
+        logger.info(f"  2C. Weekly EMA20 anchor (skipped on any V-Recovery)")
+        logger.info(f"  4. Multi-strategy: V-Recovery / Momentum / Pullback")
         logger.info("=" * 80)
         logger.info("")
         
@@ -3626,21 +3622,34 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
                     logger.info(f"  [X] FILTER 1 FAILED: Price ₹{ltp:.1f} outside range")
                     logger.info("")
                     continue
-                
+
                 logger.info(f"  [OK] FILTER 1 PASSED: Price in range")
                 filter1_count += 1
-                
-                # ================== FILTER 2: UPTREND ==================
+
+                # ================== V-RECOVERY EARLY CHECK (PRIMARY SIGNAL) ==================
+                # Run V-Recovery FIRST so a strong drop can bypass secondary filters.
+                is_v_recovery, v_recovery_details = self.v_recovery_detector.detect_pattern(
+                    open_price, high, low, ltp
+                )
+                _vr_drop_pct = v_recovery_details.get('drop_percent', 0) if v_recovery_details else 0
+                _vr_standard = is_v_recovery  # detector already enforces drop ≥ V_RECOVERY_MIN_DROP_PCT
+
+                if is_v_recovery:
+                    logger.info(f"  [V-RECOVERY] DETECTED: drop={_vr_drop_pct:.2f}% — bypasses sector/weekly (uptrend still required)")
+                else:
+                    logger.info(f"  [V-RECOVERY] Not detected yet (drop={_vr_drop_pct:.2f}%) — will recheck after other filters")
+
+                # ================== FILTER 2: UPTREND (always required) ==================
                 is_uptrend, trend_details = self.uptrend_verifier.check_uptrend(
                     symbol, instrument_token
                 )
-                
+
                 # ALWAYS print MA summary (one line) for quick reference
                 if trend_details:
                     logger.info(f"  [MA-VALUES] Price=₹{trend_details.get('price', 0):.2f} | MA20=₹{trend_details.get('ma20', 0):.2f} | EMA21=₹{trend_details.get('ema21', 0):.2f} | EMA21_slope+={trend_details.get('ema21_slope_positive', False)}")
                 else:
                     logger.warning(f"  [DEBUG] trend_details is EMPTY! This should not happen.")
-                
+
                 if not is_uptrend:
                     # Track for AI analysis
                     all_stocks_data.append({
@@ -3653,37 +3662,44 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
                     logger.info(f"  [X] FILTER 2 FAILED: Not in uptrend")
                     logger.info("")
                     continue
-                
+
                 logger.info(f"  [OK] FILTER 2 PASSED: Uptrend confirmed")
                 filter2_count += 1
-                
-                # ================== FILTER 2B: SECTOR REGIME (NEW v4.6.0!) ==================
-                sector_check = self.check_sector_regime(symbol)
-                
-                logger.info(f"  [SECTOR] {sector_check['sector']}: {sector_check['sector_change']:+.2f}% (threshold: {sector_check['threshold']}%)")
-                logger.info(f"  [SECTOR] {sector_check['reason']}")
-                
-                if not sector_check['allow_entry']:
-                    # Track for AI analysis
-                    all_stocks_data.append({
-                        'symbol': symbol,
-                        'ltp': ltp,
-                        'ma20': trend_details.get('ma20', 0),
-                        'ma50': trend_details.get('ma50', 0),
-                        'failed_at_filter': '2B_sector',
-                        'sector': sector_check['sector'],
-                        'sector_change': sector_check['sector_change']
-                    })
-                    logger.info(f"  [X] FILTER 2B FAILED: Sector is crashing")
-                    logger.info("")
-                    continue
-                
-                logger.info(f"  [OK] FILTER 2B PASSED: Sector healthy")
-                
-                # ================== FILTER 2C: WEEKLY ANCHOR (NEW v4.6.0!) ==================
-                # Skipped on fallback pass (skip_weekly_anchor=True) so intraday scans
-                # that return 0 stocks can still find candidates on down-trending weeks.
-                if not getattr(self, '_skip_weekly_anchor', False):
+
+                # ================== FILTER 2B: SECTOR REGIME ==================
+                # Bypassed when V-Recovery drop ≥0.75% (sector lagging behind a real bounce is fine)
+                if _vr_standard:
+                    sector_check = {'allow_entry': True, 'sector': 'BYPASSED', 'sector_change': 0.0, 'threshold': 0.0, 'reason': f'V-Recovery {_vr_drop_pct:.2f}% overrides sector filter'}
+                    logger.info(f"  [OK] FILTER 2B BYPASSED: V-Recovery signal ({_vr_drop_pct:.2f}%) overrides sector check")
+                else:
+                    sector_check = self.check_sector_regime(symbol)
+
+                    logger.info(f"  [SECTOR] {sector_check['sector']}: {sector_check['sector_change']:+.2f}% (threshold: {sector_check['threshold']}%)")
+                    logger.info(f"  [SECTOR] {sector_check['reason']}")
+
+                    if not sector_check['allow_entry']:
+                        # Track for AI analysis
+                        all_stocks_data.append({
+                            'symbol': symbol,
+                            'ltp': ltp,
+                            'ma20': trend_details.get('ma20', 0),
+                            'ma50': trend_details.get('ma50', 0),
+                            'failed_at_filter': '2B_sector',
+                            'sector': sector_check['sector'],
+                            'sector_change': sector_check['sector_change']
+                        })
+                        logger.info(f"  [X] FILTER 2B FAILED: Sector is crashing")
+                        logger.info("")
+                        continue
+
+                    logger.info(f"  [OK] FILTER 2B PASSED: Sector healthy")
+
+                # ================== FILTER 2C: WEEKLY ANCHOR ==================
+                # Bypassed when V-Recovery drop ≥0.75% (intraday bounce > weekly trend)
+                if _vr_standard:
+                    weekly_check = {'aligned': True, 'reason': f'V-Recovery {_vr_drop_pct:.2f}% overrides weekly anchor', 'weekly_ema20': 0, 'current_price': ltp, 'distance_pct': 0}
+                    logger.info(f"  [OK] FILTER 2C BYPASSED: V-Recovery signal ({_vr_drop_pct:.2f}%) overrides weekly anchor")
+                elif not getattr(self, '_skip_weekly_anchor', False):
                     weekly_check = self.check_weekly_anchor(symbol, instrument_token)
 
                     logger.info(f"  [WEEKLY] Price: ₹{weekly_check['current_price']:.2f} | Weekly EMA20: ₹{weekly_check['weekly_ema20']:.2f} | Distance: {weekly_check['distance_pct']:+.1f}%")
@@ -3707,12 +3723,10 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
                 else:
                     weekly_check = {'aligned': True, 'reason': 'Skipped (fallback pass)', 'weekly_ema20': 0, 'current_price': ltp, 'distance_pct': 0}
                     logger.info(f"  [OK] FILTER 2C SKIPPED (fallback scan — weekly anchor relaxed)")
-                
+
                 # ================== FILTER 4: MULTI-STRATEGY PATTERN DETECTION (v2.0 LAYERED) ==================
-                # ⭐ STRATEGY #1: V-RECOVERY (CORE LOGIC - HIGHEST PRIORITY - PRESERVED!)
-                is_v_recovery, v_recovery_details = self.v_recovery_detector.detect_pattern(
-                    open_price, high, low, ltp
-                )
+                # ⭐ STRATEGY #1: V-RECOVERY (CORE LOGIC - HIGHEST PRIORITY)
+                # Already computed above — reuse the result, no duplicate API call
                 
                 # Track which strategy triggered
                 strategy_triggered = None

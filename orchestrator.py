@@ -4630,6 +4630,14 @@ Positions: {positions}"""
                                 f"To restart: run main_orchestrator.py"
                             )
 
+                elif command == 'opt':
+                    if self.phase6 and self.telegram:
+                        try:
+                            self.telegram.send_message(self.phase6.handle_opt_command(cmd.get('args', [])))
+                        except Exception as e:
+                            logger.error(f"/opt failed: {e}")
+                            self.telegram.send_message(f"⚠️ /opt failed: {e}")
+
                 elif command == 'chain':
                     sub_cmd = cmd.get('sub_command', 'status')
 
@@ -6283,7 +6291,6 @@ GUIDELINES:
                             "Respond ONLY with valid JSON. No markdown fences, no explanation outside the JSON."
                         ),
                         messages=[{"role": "user", "content": user_prompt}],
-                        temperature=0.2,
                         max_tokens=600
                     )
 
@@ -7529,6 +7536,15 @@ GUIDELINES:
                             self._ph6_last_check = time.time()
                         except Exception as e:
                             logger.error(f"Phase 6 premium check failed: {e}")
+
+                    if (self.phase6.manual_trades_open()
+                            and time.time() - getattr(self, '_ph6_manual_last_check', 0)
+                            >= getattr(self.config, 'MANUAL_OPT_CHECK_INTERVAL_SEC', 120)):
+                        self._ph6_manual_last_check = time.time()
+                        try:
+                            self.phase6.check_manual_trades()
+                        except Exception as e:
+                            logger.error(f"Manual options check failed: {e}")
 
                 # ═══════════════════════════════════════════════════════════
                 # v8.0.0: Phase 8 Weekly Momentum Schedule

@@ -149,7 +149,6 @@ class ChatGPTStrategicAdvisor:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
-                temperature=0.3
             )
             return response.content[0].text.strip()
         except Exception as e:
@@ -451,7 +450,6 @@ Position sizing guide:
                 model=self.model,
                 system="You are an expert intraday trading advisor. Respond only in valid JSON format. Be decisive - give clear GO or NOGO.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=500
             )
             
@@ -623,7 +621,6 @@ Respond in JSON:
                     model=self.model,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
                     max_tokens=400
                 )
                 content = response.content[0].text.strip()
@@ -885,7 +882,6 @@ Respond in JSON:
                     model=self.model,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
                     max_tokens=500
                 )
                 content = response.content[0].text.strip()
@@ -1144,7 +1140,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are an autonomous trading system advisor. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=300
             )
             
@@ -1237,7 +1232,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are an autonomous trading system advisor. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=250
             )
             
@@ -1361,7 +1355,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are an expert risk manager. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=300
             )
             
@@ -1452,7 +1445,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are an expert trader. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=400
             )
             
@@ -1625,7 +1617,6 @@ Respond in this exact JSON format:
                     model=self.model,
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3,
                     max_tokens=800
                 )
                 content = response.content[0].text.strip()
@@ -1797,7 +1788,6 @@ RESPOND IN JSON:
                 model=self.model,
                 system=system_prompt,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=500
             )
 
@@ -1891,7 +1881,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are an execution trader. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=300
             )
             
@@ -1981,7 +1970,6 @@ Respond in JSON format:
                 model=self.model,
                 system="You are a risk manager. Respond only in valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=400
             )
             
@@ -2650,7 +2638,6 @@ Include:
                 model=self.model,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
-                temperature=0.3,  # Low temp for consistent probability calculations
                 max_tokens=2000   # Increased for detailed reasoning chains
             )
             
@@ -2862,7 +2849,6 @@ Respond with:
                 model=self.model,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
-                temperature=0.3,
                 max_tokens=800
             )
             
@@ -2994,7 +2980,6 @@ Respond with:
                 model=self.model,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
-                temperature=0.3,
                 max_tokens=1000
             )
             

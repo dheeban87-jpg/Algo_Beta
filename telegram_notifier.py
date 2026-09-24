@@ -2838,6 +2838,9 @@ All stocks in normal monitoring.
                 self.send_message(f"Fetching {chain_name.upper()} status...")
             logger.info(f"Chain command received: /chain {' '.join(args)}")
 
+        elif command == '/opt':
+            self.command_queue.put({'command': 'opt', 'args': args})
+
         elif command == '/ph8':
             sub_command = args[0].lower() if args else 'status'
             self.command_queue.put({

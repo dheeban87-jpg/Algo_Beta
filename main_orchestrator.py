@@ -252,7 +252,11 @@ class ZerodhaAutoLogin:
             chrome_options.add_argument('--log-level=3')
             
             # Initialize driver
-            service = Service(ChromeDriverManager().install())
+            # Prefer the apt-installed driver (matches apt Chromium on the Pi);
+            # webdriver-manager can fetch a newer driver than the installed browser.
+            _system_driver = next((p for p in ('/usr/bin/chromedriver', '/usr/lib/chromium-browser/chromedriver')
+                                   if os.path.exists(p)), None)
+            service = Service(_system_driver or ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             
             # Navigate to login URL
@@ -275,7 +279,7 @@ class ZerodhaAutoLogin:
             
             # Wait for TOTP field
             totp_input = WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text'][@inputmode='numeric' or contains(@class,'totp') or @label='External TOTP']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text'][@inputmode='numeric' or contains(@class,'totp') or @label='External TOTP' or @label='Mobile App Code']"))
             )
             
             # Generate and enter TOTP
