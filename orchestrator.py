@@ -4335,7 +4335,7 @@ class TradingOrchestrator:
         
         # Capital info
         if self.capital_manager:
-            snapshot['capital_available'] = getattr(self.capital_manager, 'capital_available', 0)
+            snapshot['capital_available'] = getattr(self.capital_manager, 'available_capital', 0)
             snapshot['capital_deployed'] = getattr(self.capital_manager, 'deployed_capital', 0)
         
         # Stock monitor data
@@ -4414,7 +4414,7 @@ class TradingOrchestrator:
         info['monitored_stocks'] = len(self.phase2.monitors) if self.phase2 and hasattr(self.phase2, 'monitors') else 0
         
         if self.capital_manager:
-            info['capital_available'] = getattr(self.capital_manager, 'capital_available', 0)
+            info['capital_available'] = getattr(self.capital_manager, 'available_capital', 0)
             info['capital_deployed'] = getattr(self.capital_manager, 'deployed_capital', 0)
         
         return info
@@ -4453,7 +4453,7 @@ class TradingOrchestrator:
                 elif command == 'capital':
                     # Send capital breakdown
                     if self.capital_manager:
-                        avail = getattr(self.capital_manager, 'capital_available', 0)
+                        avail = getattr(self.capital_manager, 'available_capital', 0)
                         deployed = getattr(self.capital_manager, 'deployed_capital', 0)
                         total = getattr(self.capital_manager, 'total_capital', 0)
                         positions = self.get_open_position_count()
@@ -5913,7 +5913,7 @@ Positions: {positions}"""
             # Capital
             if self.capital_manager:
                 data['capital_available'] = getattr(self.capital_manager, 'available_capital',
-                    getattr(self.capital_manager, 'capital_available', 0))
+                    getattr(self.capital_manager, 'available_capital', 0))
         except Exception:
             pass
 
