@@ -45,6 +45,7 @@ Version: 5.4.0
 Date: 2026-02-24
 """
 
+from ai_text import first_text
 import requests
 import logging
 import time
@@ -1762,7 +1763,7 @@ Respond ONLY with JSON: {{"score": N, "reason": "brief reason", "next_check_minu
                 max_tokens=100,
             )
 
-            text = response.content[0].text.strip()
+            text = first_text(response).strip()
 
             # v5.7.0: Robust JSON extraction — strip fences then grab outermost { … }
             # The old fence regex (non-greedy .*?) could yield empty group(1) when the

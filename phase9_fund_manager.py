@@ -25,6 +25,7 @@ Data Flow:
     Claude has NO internet access. All data is pre-fetched.
 """
 
+from ai_text import first_text
 import html as _html
 import json
 import re
@@ -723,7 +724,7 @@ class Phase9FundManager:
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None),
                              'morning_briefing')
 
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
 
             # Apply directives with safety clamps
@@ -920,7 +921,7 @@ class Phase9FundManager:
                 max_tokens=self.max_response_tokens_gate,
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None), 'midday_check')
-            result = self._extract_json(response.content[0].text)
+            result = self._extract_json(first_text(response))
             new_regime = result.get('new_regime', self.todays_regime)
             # Only allow risk-increases: AGGRESSIVE→NORMAL→CAUTIOUS→HALT
             # AGGRESSIVE=-1 (least restrictive), HALT=2 (most restrictive)
@@ -1086,7 +1087,7 @@ class Phase9FundManager:
                 max_tokens=self.max_response_tokens_heartbeat,
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None), 'heartbeat')
-            result = self._extract_json(response.content[0].text)
+            result = self._extract_json(first_text(response))
 
             # v2.2.0: Claude has full bidirectional authority over regime.
             # Safety net: ANY regime change requires a justification >=15 words citing
@@ -1295,7 +1296,7 @@ class Phase9FundManager:
                 max_tokens=self.max_response_tokens_strategic,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'weekly_review')
-            result = self._extract_json(response.content[0].text)
+            result = self._extract_json(first_text(response))
             self.weekly_directive = result
             logger.info(f"   Week theme: {result.get('week_theme', 'N/A')}")
             logger.info(f"   Focus: {result.get('focus_phases', [])}")
@@ -1510,7 +1511,7 @@ class Phase9FundManager:
             self._track_cost(self.model_haiku, getattr(response, 'usage', None),
                              'exit_advisor')
 
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
 
             action = result.get('action', 'EXIT').upper()
@@ -1796,7 +1797,7 @@ class Phase9FundManager:
                 max_tokens=400,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'recovery')
-            result = self._extract_json(response.content[0].text)
+            result = self._extract_json(first_text(response))
 
             action = str(result.get('action', 'HOLD')).upper()
 
@@ -2006,7 +2007,7 @@ class Phase9FundManager:
                 max_tokens=300,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'reentry_advisor')
-            result = self._extract_json(response.content[0].text)
+            result = self._extract_json(first_text(response))
 
             action = str(result.get('action', 'STAND_DOWN')).upper()
             if action not in ('REENTER', 'WATCHLIST', 'STAND_DOWN'):
@@ -2147,7 +2148,7 @@ class Phase9FundManager:
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None),
                              'eod_review')
 
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
 
             self._eod_review_done = True
@@ -2320,7 +2321,7 @@ Never override HALT regime — that is a circuit breaker."""
                 max_tokens=600,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'chat')
-            raw = response.content[0].text
+            raw = first_text(response)
 
             # Extract answer (text before JSON block) and optional directives
             directives = {}
@@ -2607,7 +2608,7 @@ Never override HALT regime — that is a circuit breaker."""
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None),
                              'self_calibration')
-            calibration_text = response.content[0].text.strip()
+            calibration_text = first_text(response).strip()
 
             # Write/replace TODAY'S CALIBRATION section in phase knowledge file
             knowledge_path = os.path.join('data', 'claude_phase_knowledge.md')
@@ -3337,6 +3338,10 @@ RULES for new_lessons:
             pass
 
         raise ValueError(f"Could not extract JSON from response: {original[:300]}")
+
+    def _get_default_directives(self) -> dict:
+        """Neutral directives (init defaults) used when the briefing cannot run."""
+        return self._get_current_directives()
 
     def _get_current_directives(self) -> dict:
         """Return current directives without making a Claude API call.

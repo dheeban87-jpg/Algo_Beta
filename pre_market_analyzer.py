@@ -20,6 +20,7 @@ Version: 1.1.0 (OpenAI 2.x API)
 Date: 2026-01-13
 """
 
+from ai_text import first_text
 import logging
 import anthropic
 from datetime import datetime, timedelta
@@ -402,7 +403,7 @@ Focus on:
                 max_tokens=600
             )
 
-            result_text = response.content[0].text.strip()
+            result_text = first_text(response).strip()
             
             # Extract JSON
             import json

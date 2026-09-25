@@ -1,3 +1,4 @@
+from ai_text import first_text
 from connection_health_monitor import ConnectionHealthMonitor
 from daily_blackbox import DailyBlackbox
 from chatgpt_strategic_advisor import ChatGPTStrategicAdvisor
@@ -6295,7 +6296,7 @@ GUIDELINES:
                     )
 
                     import json
-                    raw_text = ai_response.content[0].text.strip()
+                    raw_text = first_text(ai_response).strip()
                     # Handle potential markdown fencing
                     if raw_text.startswith('```'):
                         raw_text = raw_text.split('\n', 1)[-1].rsplit('```', 1)[0].strip()

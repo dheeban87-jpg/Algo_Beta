@@ -262,6 +262,7 @@ Date: January 8, 2026
 Version: 4.1.1 - TA-LIB PROFESSIONAL + PERFORMANCE FIX
 """
 
+from ai_text import first_text
 import os
 import sys
 import json
@@ -3377,7 +3378,7 @@ Format your response with clear numbered sections and bullet points for easy rea
                 )
 
                 # Extract the analysis
-                analysis = response.content[0].text
+                analysis = first_text(response)
                 logger.info("  [AI] ✅ Analysis received successfully from ChatGPT!")
                 return analysis
 
@@ -3497,7 +3498,7 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
                 max_tokens=gate_max_tokens
             )
 
-            raw_text = response.content[0].text.strip()
+            raw_text = first_text(response).strip()
 
             # Clean markdown fences if present
             if raw_text.startswith('```'):

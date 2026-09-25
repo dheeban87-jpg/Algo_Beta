@@ -23,6 +23,7 @@ Version: 3.4.0
 Date: 2026-02-04
 """
 
+from ai_text import first_text
 import anthropic
 import logging
 import re
@@ -151,7 +152,7 @@ class ChatGPTStrategicAdvisor:
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
             )
-            return response.content[0].text.strip()
+            return first_text(response).strip()
         except Exception as e:
             logger.warning(f"ChatGPT get_decision failed: {e}")
             return None
@@ -454,7 +455,7 @@ Position sizing guide:
                 max_tokens=500
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             decision = self._extract_json(content)
             
             # Validate decision
@@ -624,7 +625,7 @@ Respond in JSON:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=400
                 )
-                content = response.content[0].text.strip()
+                content = first_text(response).strip()
                 logger.info(f"   v5.5 Chat Completions fallback succeeded for {symbol}")
             except Exception as e2:
                 logger.error(f"v5.5 Both APIs failed for {symbol}: {e2}")
@@ -885,7 +886,7 @@ Respond in JSON:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=500
                 )
-                content = response.content[0].text.strip()
+                content = first_text(response).strip()
                 logger.info(f"   Chat Completions fallback succeeded for {symbol}")
             except Exception as e2:
                 logger.error(f"Both APIs failed for {symbol}: {e2}")
@@ -1144,7 +1145,7 @@ Respond in JSON format:
                 max_tokens=300
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             decision = self._extract_json(content)
             
             logger.info(f"🤖 GPT SHUTDOWN DECISION:")
@@ -1236,7 +1237,7 @@ Respond in JSON format:
                 max_tokens=250
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             decision = self._extract_json(content)
             
             logger.info(f"🤖 GPT ADAPTIVE SCAN DECISION:")
@@ -1359,7 +1360,7 @@ Respond in JSON format:
                 max_tokens=300
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             result = self._extract_json(content)
             
             logger.info(f"   Suggested Capital: ₹{result.get('suggested_capital', base_capital):,.0f}")
@@ -1449,7 +1450,7 @@ Respond in JSON format:
                 max_tokens=400
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             result = self._extract_json(content)
             
             logger.info(f"   Stop Loss: ₹{result.get('stop_loss', 0):.2f}")
@@ -1523,7 +1524,7 @@ reasoning; set strategy NONE and legs [].
         text = None
         try:
             resp = client.messages.create(
-                model=self.model, system=system_prompt, max_tokens=6000,
+                model=self.model, system=system_prompt, max_tokens=6000, extra_body={"output_config": {"effort": "high"}},
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[{"type": "web_search_20260209", "name": "web_search"}],
             )
@@ -1532,7 +1533,7 @@ reasoning; set strategy NONE and legs [].
             logger.warning(f"   Marker AI review with web search failed: {e1}")
             try:
                 resp = client.messages.create(
-                    model=self.model, system=system_prompt, max_tokens=6000,
+                    model=self.model, system=system_prompt, max_tokens=6000, extra_body={"output_config": {"effort": "high"}},
                     messages=[{"role": "user", "content": user_prompt}],
                 )
                 text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
@@ -1695,7 +1696,7 @@ Respond in this exact JSON format:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=800
                 )
-                content = response.content[0].text.strip()
+                content = first_text(response).strip()
                 logger.info(f"   Chat Completions fallback succeeded for {symbol} options")
             except Exception as e2:
                 logger.error(f"   Both APIs failed for {symbol} options: {e2}")
@@ -1867,7 +1868,7 @@ RESPOND IN JSON:
                 max_tokens=500
             )
 
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             result = self._extract_json(content)
 
             if not result:
@@ -1960,7 +1961,7 @@ Respond in JSON format:
                 max_tokens=300
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             result = self._extract_json(content)
             
             # Ensure required keys exist with sane defaults
@@ -2049,7 +2050,7 @@ Respond in JSON format:
                 max_tokens=400
             )
             
-            content = response.content[0].text.strip()
+            content = first_text(response).strip()
             result = self._extract_json(content)
             
             logger.info(f"   Risk Level: {result.get('risk_level', 'MEDIUM')}")
@@ -2717,7 +2718,7 @@ Include:
                 max_tokens=2000   # Increased for detailed reasoning chains
             )
             
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
             
             # ═══════════════════════════════════════════════════════════════
@@ -2928,7 +2929,7 @@ Respond with:
                 max_tokens=800
             )
             
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
             
             # Validate
@@ -3059,7 +3060,7 @@ Respond with:
                 max_tokens=1000
             )
             
-            content = response.content[0].text
+            content = first_text(response)
             result = self._extract_json(content)
             
             if 'operation_mode' not in result:
