@@ -446,7 +446,7 @@ class Config:
     SECTOR_INDEX_MAP = {
         'IT': 'NIFTY IT',
         'BANKING': 'NIFTY BANK',
-        'FINANCE': 'NIFTY FINANCIAL SERVICES',
+        'FINANCE': 'NIFTY FIN SERVICE',
         'PHARMA': 'NIFTY PHARMA',
         'AUTO': 'NIFTY AUTO',
         'FMCG': 'NIFTY FMCG',
