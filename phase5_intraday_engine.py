@@ -420,7 +420,7 @@ class Phase5IntradayEngine:
         logger.info(f"Max Trades/Day: {self.config.MAX_TRADES_PER_DAY}")
 
         # Paper trading mode
-        self._paper_mode = getattr(self.config, 'PH5_PAPER_MODE', False)
+        self._paper_mode = bool(getattr(self.config, 'PH5_PAPER_MODE', False) or getattr(self.config, 'MASTER_PAPER_MODE', False))
         self._paper_trades: list = []
         if self._paper_mode:
             logger.info("📝 PAPER TRADING MODE — no real orders will be placed")
@@ -3729,7 +3729,7 @@ Respond ONLY with valid JSON:
 
     def _place_order(self, **order_params) -> str:
         """Wrapper: routes to paper or live order placement."""
-        self._paper_mode = getattr(self.config, 'PH5_PAPER_MODE', self._paper_mode)
+        self._paper_mode = bool(getattr(self.config, 'PH5_PAPER_MODE', self._paper_mode) or getattr(self.config, 'MASTER_PAPER_MODE', False))
         if self._paper_mode:
             return self._place_paper_order(order_params)
         return self.kite.place_order(

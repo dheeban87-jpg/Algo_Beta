@@ -478,6 +478,12 @@ def main():
         kite = KiteConnect(api_key=config.ZERODHA_API_KEY)
         kite.set_access_token(access_token)
         logger.info("✅ KiteConnect initialized")
+
+        # PAPER MODE: every module gets a client whose order/GTT writes never reach the broker
+        if getattr(config, 'MASTER_PAPER_MODE', False):
+            from paper_kite_proxy import PaperKiteProxy
+            kite = PaperKiteProxy(kite, tag='SYS')
+            logger.warning("📝 MASTER_PAPER_MODE: broker order/GTT writes are BLOCKED for all phases")
         
         if telegram:
             telegram.send_message(

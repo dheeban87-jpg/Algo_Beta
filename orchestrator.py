@@ -2453,7 +2453,8 @@ class TradingOrchestrator:
                     _brain_regime = getattr(self.phase9, 'todays_regime', 'NORMAL') if self.phase9 else 'NORMAL'
                     # MARKER mode: entries are 1-share radar positions, so only HALT stops them
                     _marker_only = (getattr(self.config, 'MARKER_MODE_ENABLED', False)
-                                    and getattr(self.config, 'MARKER_BUY_ON_CONFIRMATION', False))
+                                    and getattr(self.config, 'MARKER_BUY_ON_CONFIRMATION', False)
+                                    and not getattr(self.config, 'MARKER_RESPECT_DEFENSIVE', False))
                     if _brain_regime in ('HALT', 'DEFENSIVE') or self._ph4_brain_defensive:
                         if _brain_regime == 'HALT' or (self._ph4_brain_defensive and not _marker_only):
                             logger.info(f"🧠 PH9 {_brain_regime}/DEFENSIVE — all new entries blocked")

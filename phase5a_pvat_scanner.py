@@ -188,7 +188,7 @@ class Phase5APVAT:
         self._last_boundary_scanned: Optional[datetime] = None  # Last 15-min boundary we scanned
 
         # v5.6.1: Paper trading mode — GUI-controlled via orchestrator setattr
-        self._paper_mode = getattr(config, 'PH5A_PAPER_MODE', False)
+        self._paper_mode = bool(getattr(config, 'PH5A_PAPER_MODE', False) or getattr(config, 'MASTER_PAPER_MODE', False))
         self._paper_log_path = os.path.join('data', 'ph5a_paper_trades.json')
         self._paper_counter = 0
         self._last_candle_time = None   # Track 15-min candle boundaries for acceptance counting
@@ -1464,7 +1464,7 @@ class Phase5APVAT:
         Re-reads config each call so GUI toggles take effect immediately.
         v5.7.0: Hard guard — if config says PAPER, NEVER reach kite.place_order."""
         # Re-read every call so a GUI toggle takes effect without restart
-        _cfg_paper = getattr(self.config, 'PH5A_PAPER_MODE', False)
+        _cfg_paper = bool(getattr(self.config, 'PH5A_PAPER_MODE', False) or getattr(self.config, 'MASTER_PAPER_MODE', False))
         if _cfg_paper:
             self._paper_mode = True          # lock instance flag in sync with config
         if self._paper_mode or _cfg_paper:   # either source is enough

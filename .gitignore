@@ -12,3 +12,6 @@ __pycache__/
 # Windows quirk: a stray file literally named "nul" (reserved device name)
 nul
 **/nul
+
+# Local secrets (API keys, passwords, TOTP) — never commit
+secrets.env

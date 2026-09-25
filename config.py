@@ -400,6 +400,24 @@ def safe_json_get(data: dict, key: str, default: Any = None) -> Any:
 # CONFIGURATION CLASS - ALL SETTINGS IN ONE PLACE
 # ============================================================================
 
+# ── Local secrets: read secrets.env (git-ignored) into the environment before the class body ──
+def _load_secrets_env():
+    import os as _os
+    _p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'secrets.env')
+    try:
+        with open(_p, encoding='utf-8') as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith('#') and '=' in _line:
+                    _k, _v = _line.split('=', 1)
+                    _os.environ.setdefault(_k.strip(), _v.strip())
+    except FileNotFoundError:
+        pass
+
+
+_load_secrets_env()
+
+
 class Config:
     """
     Master configuration for the autonomous trading system.
@@ -676,7 +694,7 @@ class Config:
     ]
     
     # ============================================================
-    # ZERODHA API CREDENTIALS 
+    # ZERODHA API CREDENTIALS
     # ============================================================
     # ✅ FIX #13: Support environment variables (more secure)
     # Falls back to hardcoded values if env vars not set
@@ -684,8 +702,8 @@ class Config:
     ZERODHA_API_KEY = os.environ.get('ZERODHA_API_KEY', "v5jxo2jrno6fsp9g")
     ZERODHA_API_SECRET = os.environ.get('ZERODHA_API_SECRET', "8zqyhfkaxtor582pdprt4g3ix1bvokxe")
     ZERODHA_USER_ID = os.environ.get('ZERODHA_USER_ID', "YV4062")
-    ZERODHA_PASSWORD = os.environ.get('ZERODHA_PASSWORD', "Sandheba@98")
-    ZERODHA_TOTP_SECRET = os.environ.get('ZERODHA_TOTP_SECRET', "BRO74SETKV2PZVWTWEX7MCZZLWVI7KE6")
+    ZERODHA_PASSWORD = os.environ.get('ZERODHA_PASSWORD', "")
+    ZERODHA_TOTP_SECRET = os.environ.get('ZERODHA_TOTP_SECRET', "")
 
     # ═══════════════════════════════════════════════════════════════════
     # ✅ KITE ALIASES - main_orchestrator.py expects these names
@@ -804,6 +822,7 @@ class Config:
     # MARKER STRATEGY: buy 1 share as a radar; options are suggested on the 2nd dip
     MARKER_MODE_ENABLED = True
     MARKER_QUANTITY = 1
+    MARKER_RESPECT_DEFENSIVE = False   # False = 1-share markers still allowed on Phase 9 DEFENSIVE days (HALT always blocks). Set True to block them.
     MARKER_BUY_ON_CONFIRMATION = True  # buy the marker once Phase 1 confirms V-Recovery and score >= entry min (skip RSI trigger)
     MARKER_DISASTER_STOP_PCT = 8.0     # only automatic exit
     MARKER_TARGET_PCT = 25.0           # GTT target kept far so it never fires in a 5-6 day hold

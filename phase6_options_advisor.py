@@ -241,7 +241,8 @@ class Phase6OptionsAdvisor:
                 pass
 
         # v6.1: Live order mode
-        self._live_enabled = getattr(self.config, 'PH6_LIVE_ORDERS_ENABLED', False)
+        self._live_enabled = bool(getattr(self.config, 'PH6_LIVE_ORDERS_ENABLED', False)
+                                  and not getattr(self.config, 'MASTER_PAPER_MODE', False))
 
         # v1.0.0: Candlestick pattern bonus tracking
         self._pattern_bonuses: Dict[str, Dict] = {}

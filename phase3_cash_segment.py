@@ -347,7 +347,8 @@ class Phase3CashSegmentExecutor:
         # Use passed Kite instance (already authenticated)
         if getattr(config, 'MASTER_PAPER_MODE', False):
             from paper_kite_proxy import PaperKiteProxy
-            kite = PaperKiteProxy(kite, tag='PH3')
+            if not isinstance(kite, PaperKiteProxy):
+                kite = PaperKiteProxy(kite, tag='PH3')
             logger.info("📝 Phase 3: PAPER MODE — all order/GTT writes are blocked from the broker")
         self.kite = kite
         
