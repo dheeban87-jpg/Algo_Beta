@@ -1776,6 +1776,50 @@ class TradingOrchestrator:
                     updated += 1
         return updated
     
+    def _restore_paper_positions(self):
+        """Re-register open PAPER positions after a restart.
+
+        The orchestrator seeds positions from the real broker only, so paper positions (which never
+        exist at the broker) would otherwise vanish on every restart and be overwritten in the file.
+        Uses the same registration calls as a fresh entry.
+        """
+        if not getattr(self.config, 'MASTER_PAPER_MODE', False):
+            return
+        try:
+            import json as _json
+            path = getattr(self.config, 'POSITIONS_FILE', 'data/phase3_outputs/positions.json')
+            if not os.path.exists(path):
+                return
+            with open(path) as fh:
+                saved = _json.load(fh)
+            saved = saved if isinstance(saved, list) else list(saved.values())
+            restored = []
+            for pos in saved:
+                if not (isinstance(pos, dict) and pos.get('is_paper_trade') and pos.get('status') == 'OPEN'):
+                    continue
+                symbol = pos.get('symbol')
+                if not symbol or (self.phase4 and symbol in self.phase4.positions):
+                    continue
+                if self.phase3:
+                    self.phase3._set_position(symbol, pos)
+                    self.phase3.capital_used += float(pos.get('entry_value', 0) or 0)
+                    if self.capital_manager:
+                        self.capital_manager.deploy(symbol=symbol, amount=float(pos.get('entry_value', 0) or 0),
+                                                    quantity=int(pos.get('quantity', 0) or 0),
+                                                    entry_price=float(pos.get('entry_price', 0) or 0),
+                                                    product=pos.get('product', 'CNC'))
+                if self.phase4:
+                    self.phase4.on_position_opened(pos, {'source': 'RESTORED_PAPER'})
+                if self.phase2:
+                    self.phase2.traded_today.add(symbol)
+                restored.append(symbol)
+            if restored:
+                logger.info(f"📂 Restored {len(restored)} paper position(s) after restart: {restored}")
+                if self.telegram:
+                    self.telegram.send_message(f"📂 Restored paper position(s) after restart: {', '.join(restored)}")
+        except Exception as e:
+            logger.error(f"Paper position restore failed: {e}")
+
     def broker_sync_positions(self):
         """
         Sync central state with broker positions.
@@ -7011,6 +7055,8 @@ GUIDELINES:
             except Exception:
                 pass
         
+        self._restore_paper_positions()
+
         logger.info("Entering main event loop...")
         logger.info("")
         
