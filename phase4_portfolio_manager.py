@@ -10153,7 +10153,6 @@ class Phase4PortfolioManager:
                     "Your response must be ONLY valid JSON, no other text."
                 ),
                 input=prompt,
-                temperature=0.3,
             )
 
             elapsed_ms = int((time_mod.time() - start) * 1000)

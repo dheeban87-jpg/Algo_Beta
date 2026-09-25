@@ -3373,7 +3373,6 @@ Format your response with clear numbered sections and bullet points for easy rea
                     model=_analysis_model,
                     system="You are an expert NSE options trading analyst with deep knowledge of technical analysis, market timing, swing trading strategies, and Tuesday expiry effects in Indian markets.",
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=self.config.AI_TEMPERATURE,
                     max_tokens=_analysis_tokens
                 )
 
@@ -3495,7 +3494,6 @@ Respond ONLY with valid JSON, no markdown, no backticks, no other text:
                 model=gate_model,
                 system="You are an NSE intraday trading system controller. You decide whether intraday scalp conditions exist. PH5A can trade BOTH long breakouts AND short breakdowns — a bearish market is a SHORT opportunity, not a reason to skip. Respond ONLY with valid JSON. No markdown, no backticks.",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=gate_temperature,
                 max_tokens=gate_max_tokens
             )
 

@@ -1760,7 +1760,6 @@ Respond ONLY with JSON: {{"score": N, "reason": "brief reason", "next_check_minu
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=100,
-                temperature=0.3
             )
 
             text = response.content[0].text.strip()

@@ -716,7 +716,6 @@ class Phase9FundManager:
                 model=self.model_sonnet,
                 system=self._get_fund_manager_system_prompt(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=self.max_response_tokens_strategic
             )
 
@@ -918,7 +917,6 @@ class Phase9FundManager:
                 model=self.model_haiku,
                 system=self._get_fund_manager_system_prompt_short(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
                 max_tokens=self.max_response_tokens_gate,
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None), 'midday_check')
@@ -1085,7 +1083,6 @@ class Phase9FundManager:
                 model=self.model_haiku,
                 system=self._get_fund_manager_system_prompt_short(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
                 max_tokens=self.max_response_tokens_heartbeat,
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None), 'heartbeat')
@@ -1295,7 +1292,6 @@ class Phase9FundManager:
                 model=self.model_sonnet,
                 system=self._get_fund_manager_system_prompt(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
                 max_tokens=self.max_response_tokens_strategic,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'weekly_review')
@@ -1507,7 +1503,6 @@ class Phase9FundManager:
                 model=self.model_haiku,
                 system=self._get_fund_manager_system_prompt_short(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
                 max_tokens=self.max_response_tokens_gate
             )
 
@@ -1798,7 +1793,6 @@ class Phase9FundManager:
                 model=self.model_sonnet,   # Sonnet — recovery is high-stakes
                 system=self._get_fund_manager_system_prompt_short(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
                 max_tokens=400,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'recovery')
@@ -2009,7 +2003,6 @@ class Phase9FundManager:
                 model=self.model_sonnet,   # High-stakes — use Sonnet
                 system=self._get_fund_manager_system_prompt_short(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
                 max_tokens=300,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'reentry_advisor')
@@ -2147,7 +2140,6 @@ class Phase9FundManager:
                 model=self.model_sonnet,
                 system=self._get_fund_manager_system_prompt(),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.4,
                 max_tokens=self.max_response_tokens_strategic
             )
 
@@ -2325,7 +2317,6 @@ Never override HALT regime — that is a circuit breaker."""
                 model=self.model_sonnet,
                 system=self._get_fund_manager_system_prompt(),
                 messages=[{'role': 'user', 'content': prompt}],
-                temperature=0.4,
                 max_tokens=600,
             )
             self._track_cost(self.model_sonnet, getattr(response, 'usage', None), 'chat')
@@ -2612,7 +2603,6 @@ Never override HALT regime — that is a circuit breaker."""
                     "Output 2-3 numbered rules only, each ≤20 words."
                 ),
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
                 max_tokens=150,
             )
             self._track_cost(self.model_haiku, getattr(response, 'usage', None),
