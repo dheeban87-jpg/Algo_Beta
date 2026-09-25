@@ -2360,6 +2360,8 @@ class Phase3CashSegmentExecutor:
         
         entry_start = (self.config.ENTRY_START_HOUR, self.config.ENTRY_START_MIN)
         entry_end = (self.config.ENTRY_END_HOUR, self.config.ENTRY_END_MIN)
+        if getattr(self.config, 'MARKER_MODE_ENABLED', False):
+            entry_end = (getattr(self.config, 'MARKER_ENTRY_END_HOUR', 15), getattr(self.config, 'MARKER_ENTRY_END_MIN', 0))
         
         current_time = (hour, minute)
         
@@ -3088,6 +3090,9 @@ class Phase3CashSegmentExecutor:
             # DETECT ORPHAN POSITIONS (at broker, not in JSON)
             # ═══════════════════════════════════════════════════════════════
             orphan_symbols = broker_symbols - json_symbols
+            if getattr(self.config, 'MASTER_PAPER_MODE', False) and orphan_symbols:
+                logger.info(f"   Paper mode: ignoring real broker positions {orphan_symbols} (not adopted)")
+                orphan_symbols = set()
             
             if orphan_symbols:
                 logger.critical(f"🚨 ORPHAN POSITIONS DETECTED: {orphan_symbols}")
@@ -3135,7 +3140,9 @@ class Phase3CashSegmentExecutor:
             # ═══════════════════════════════════════════════════════════════
             # DETECT GHOST POSITIONS (in JSON, not at broker)
             # ═══════════════════════════════════════════════════════════════
-            ghost_symbols = json_symbols - broker_symbols
+            # Paper positions never exist at the broker, so they are not ghosts
+            ghost_symbols = {sym for sym in (json_symbols - broker_symbols)
+                             if not self.positions.get(sym, {}).get('is_paper_trade', False)}
             
             if ghost_symbols:
                 logger.warning(f"👻 GHOST POSITIONS DETECTED: {ghost_symbols}")
