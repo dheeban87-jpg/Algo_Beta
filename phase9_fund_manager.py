@@ -3464,4 +3464,9 @@ RULES for new_lessons:
             'ph4_directive':          self.todays_ph4_directive,
             'ph6_directive':          self.todays_ph6_directive,
             'ph8_directive':          self.todays_ph8_directive,
+            # Aliases: orchestrator and Phase 4 read these shorter names
+            'stop_atr_mult':          self.todays_stop_atr_mult,
+            'target_atr_mult':        self.todays_target_atr_mult,
+            'entry_window':           self.todays_entry_window,
+            'regime':                 self.todays_regime,
         }
