@@ -1462,8 +1462,17 @@ class Phase3CashSegmentExecutor:
         # ✅ Step 3.7: Fund Manager Approval Gate (Phase 9 v1.0.0)
         # ═══════════════════════════════════════════════════════════════
 
+        _marker_gate_bypass = (getattr(self.config, 'MARKER_MODE_ENABLED', False)
+                               and getattr(self.config, 'MARKER_BUY_ON_CONFIRMATION', False))
+        if _marker_gate_bypass and hasattr(self, 'fund_manager') and self.fund_manager:
+            if (getattr(self.fund_manager, 'todays_regime', 'NORMAL') or 'NORMAL') == 'HALT':
+                logger.warning(f"⛔ PH9 HALT mode — rejecting marker {symbol}")
+                return None
+            logger.info(f"   📍 MARKER mode: Phase 9 entry approval skipped for {symbol}")
+
         if (hasattr(self, 'fund_manager') and self.fund_manager
-                and getattr(self.config, 'PH9_ENTRY_GATE_ENABLED', False)):
+                and getattr(self.config, 'PH9_ENTRY_GATE_ENABLED', False)
+                and not _marker_gate_bypass):
 
             try:
                 # v1.1.0: Respect operation_mode (HALT blocks, CAUTIOUS throttles)

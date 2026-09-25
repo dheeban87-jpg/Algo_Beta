@@ -420,8 +420,8 @@ class Config:
     # V-RECOVERY SCAN PARAMETERS
     # ============================================================
     
-    MIN_PRICE = 500   # v5.3.3: expanded from 900
-    MAX_PRICE = 2500  # v5.3.3: expanded from 1800
+    MIN_PRICE = 900   # aligned with Phase 1 (strategy range 900-3500)
+    MAX_PRICE = 3500
     V_RECOVERY_MIN_DROP_PCT = 1.0     # Was 0.75 → Now 1.0 (stronger patterns)
                                        # Require minimum 1% drop for quality signals
                                        # Expected: Better entry quality, higher win rate
@@ -507,8 +507,8 @@ class Config:
     # ============================================================
     # PHASE 1 STOCK SELECTION
     # ============================================================
-    PRICE_MIN = 500   # Minimum stock price (v5.3.3: expanded from 900)
-    PRICE_MAX = 2500  # Maximum stock price (v5.3.3: expanded from 1800)
+    PRICE_MIN = 900   # Minimum stock price (aligned with Phase 1)
+    PRICE_MAX = 3500  # Maximum stock price (aligned with Phase 1)
     MASTER_LIST_SIZE = 150  # Scan top N liquid NSE stocks
     MIN_VOLUME_ABSOLUTE = 50000  # Absolute volume floor for stock filtering
     MIN_ATR_PERCENT = 0.5        # Minimum ATR as % of price (need volatility)
@@ -804,6 +804,7 @@ class Config:
     # MARKER STRATEGY: buy 1 share as a radar; options are suggested on the 2nd dip
     MARKER_MODE_ENABLED = True
     MARKER_QUANTITY = 1
+    MARKER_BUY_ON_CONFIRMATION = True  # buy the marker once Phase 1 confirms V-Recovery and score >= entry min (skip RSI trigger)
     MARKER_DISASTER_STOP_PCT = 8.0     # only automatic exit
     MARKER_TARGET_PCT = 25.0           # GTT target kept far so it never fires in a 5-6 day hold
     MARKER_MAX_HOLD_DAYS = 6

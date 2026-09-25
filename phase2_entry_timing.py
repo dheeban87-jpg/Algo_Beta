@@ -648,9 +648,12 @@ class HardGates:
         if data.capital_available < min_position:
             return (False, f"Capital {data.capital_available:.0f} insufficient")
 
-        # HG-6: RSI trigger fired
+        # HG-6: RSI trigger fired. A 1-share marker only needs the V-Recovery Phase 1 already
+        # confirmed, so it skips the RSI dip-and-ramp timing (all other gates still apply).
         if not tracker.triggered:
-            return (False, f"RSI trigger not fired (state={tracker.state})")
+            if not (getattr(config, 'MARKER_MODE_ENABLED', False)
+                    and getattr(config, 'MARKER_BUY_ON_CONFIRMATION', False)):
+                return (False, f"RSI trigger not fired (state={tracker.state})")
 
         # ALL PASSED
         return (True, "")

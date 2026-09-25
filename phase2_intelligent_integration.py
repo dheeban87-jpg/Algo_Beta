@@ -158,7 +158,11 @@ class IntelligentPhase2Wrapper:
             return []
         
         # GPT APPROVAL GATE
-        if self.strategic_advisor and getattr(self.config, 'GPT_APPROVE_ENTRIES', True):
+        _marker_bypass = (getattr(self.config, 'MARKER_MODE_ENABLED', False)
+                          and getattr(self.config, 'MARKER_BUY_ON_CONFIRMATION', False))
+        if _marker_bypass:
+            logger.info("MARKER mode: skipping AI entry approval (1-share radar position)")
+        if self.strategic_advisor and getattr(self.config, 'GPT_APPROVE_ENTRIES', True) and not _marker_bypass:
             approved_signals = []
             
             for signal in tradeable:

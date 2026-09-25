@@ -141,6 +141,9 @@ class IntelligentDecisionEngine:
             'weak': getattr(config, 'SCORE_THRESHOLD_WEAK', 60),
             'skip': getattr(config, 'SCORE_THRESHOLD_SKIP', 60)
         }
+        # MARKER mode: a 1-share radar position only needs the Phase 2 entry minimum
+        if getattr(config, 'MARKER_MODE_ENABLED', False) and getattr(config, 'MARKER_BUY_ON_CONFIRMATION', False):
+            self.THRESHOLDS['skip'] = min(self.THRESHOLDS['skip'], getattr(config, 'PH2_SCORE_ENTRY_MIN', 45))
         logger.info(f"   📊 Score Thresholds: Strong≥{self.THRESHOLDS['strong']} | Moderate≥{self.THRESHOLDS['moderate']} | Weak≥{self.THRESHOLDS['weak']} | Skip<{self.THRESHOLDS['skip']}")
         
         # ═══════════════════════════════════════════════════════════════
