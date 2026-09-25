@@ -1085,7 +1085,7 @@ class Config:
     # PHASE 3: ORDER EXECUTION CONFIGURATION
     # ============================================================
     
-    ENABLE_PHASE3 = False  # Paper trading by default
+    ENABLE_PHASE3 = True   # Phase 3 runs behind PaperKiteProxy while MASTER_PAPER_MODE=True (no real orders)
     # ═══════════════════════════════════════════════════════════════════════════
     # V3.4.0 ADDITIONS - NON-BLOCKING ARCHITECTURE
     # ═══════════════════════════════════════════════════════════════════════════

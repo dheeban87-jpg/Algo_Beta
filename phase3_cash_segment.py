@@ -345,6 +345,10 @@ class Phase3CashSegmentExecutor:
         self.strategic_advisor = None  # Will be set by orchestrator
         self.options_advisor = None    # v6.0: Phase 6 Options Advisory (set by orchestrator)
         # Use passed Kite instance (already authenticated)
+        if getattr(config, 'MASTER_PAPER_MODE', False):
+            from paper_kite_proxy import PaperKiteProxy
+            kite = PaperKiteProxy(kite, tag='PH3')
+            logger.info("📝 Phase 3: PAPER MODE — all order/GTT writes are blocked from the broker")
         self.kite = kite
         
         # ═══════════════════════════════════════════════════════════════════
@@ -2150,7 +2154,9 @@ class Phase3CashSegmentExecutor:
                         f"{max(1, int(_cnc_loss_cap / _actual_stop_dist))} shares manually"
                     )
 
-        if getattr(self.config, 'ENABLE_GTT_ORDERS', True):
+        if getattr(self.config, 'MASTER_PAPER_MODE', False):
+            logger.info("   📝 PAPER MODE: no broker GTT — Phase 4 monitors the stop")
+        elif getattr(self.config, 'ENABLE_GTT_ORDERS', True):
             MAX_GTT_RETRIES = getattr(self.config, 'GTT_PLACEMENT_RETRIES', 2)
             GTT_RETRY_DELAY = getattr(self.config, 'GTT_RETRY_DELAY_SECONDS', 3)
             gtt_ids = None
@@ -2248,7 +2254,7 @@ class Phase3CashSegmentExecutor:
                         f"Attempts: {MAX_GTT_RETRIES+1}\n"
                         f"Error: {str(gtt_last_error)[:100]}\n\n"
                         f"\u26a0\ufe0f MANUAL STOP MONITORING ACTIVATED\n"
-                        f"Stop Price: \u20b9{stop_p:.2f if stop_p else 'N/A'}\n\n"
+                        f"Stop Price: \u20b9{(f'{stop_p:.2f}' if stop_p else 'N/A')}\n\n"
                         f"System will monitor and exit if stop hit.\n"
                         f"Emergency exit in 5 min if stop not working."
                     )
@@ -2599,6 +2605,12 @@ class Phase3CashSegmentExecutor:
 
         # PAPER MODE FIX: never hit real broker in paper mode
         if getattr(self.config, 'MASTER_PAPER_MODE', False):
+            from paper_kite_proxy import PaperKiteProxy
+            if isinstance(self.kite, PaperKiteProxy):
+                # The proxy records qty/price so the fill check that follows can answer COMPLETE
+                return self.kite.place_order(tradingsymbol=symbol, exchange='NSE',
+                                             transaction_type=transaction_type, quantity=quantity,
+                                             order_type='MARKET', product=product)
             import uuid
             paper_id = f"PH3_PAPER_{uuid.uuid4().hex[:8].upper()}"
             try:

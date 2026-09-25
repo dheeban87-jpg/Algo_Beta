@@ -1788,6 +1788,10 @@ class TradingOrchestrator:
 
         v4.5.4 FIX: Now releases capital for externally closed positions!
         """
+        # Paper positions never exist at the broker; syncing would remove them as 'closed externally'
+        if getattr(self.config, 'MASTER_PAPER_MODE', False):
+            return
+
         # v5.0.0 SSOT: Use handler if available
         if hasattr(self, '_broker_sync_handler') and self._broker_sync_handler:
             self._broker_sync_handler.sync()
