@@ -824,7 +824,8 @@ class StartupController:
             margins = self.kite.margins()
             equity = margins.get('equity', {})
             
-            available_cash = equity.get('available', {}).get('cash', 0)
+            # live_balance includes today's pay-ins; 'cash' is only the settled opening balance
+            available_cash = equity.get('available', {}).get('live_balance', equity.get('available', {}).get('cash', 0))
             used_margin = equity.get('utilised', {}).get('debits', 0)
             
             # Calculate free capital
@@ -834,6 +835,8 @@ class StartupController:
             # Determine position capacity
             capital_per_trade = getattr(self.config, 'BASE_CAPITAL_PER_TRADE', 2000)
             max_positions = int(free_capital / capital_per_trade) if capital_per_trade > 0 else 0
+            if max_positions == 0 and free_capital >= self.MIN_FREE_CAPITAL:
+                max_positions = 1
             max_total = getattr(self.config, 'MAX_POSITIONS', 3)
             
             # Account for existing positions
@@ -1392,7 +1395,7 @@ class StartupController:
                 try:
                     margins = self.kite.margins()
                     equity = margins.get('equity', {})
-                    cash = equity.get('available', {}).get('cash', 0)
+                    cash = equity.get('available', {}).get('live_balance', equity.get('available', {}).get('cash', 0))
                     buffer = getattr(self.config, 'CAPITAL_BUFFER', 2000)
                     free = max(0, cash - buffer)
                     
