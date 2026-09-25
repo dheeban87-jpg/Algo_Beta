@@ -822,8 +822,8 @@ class Config:
     # MARKER STRATEGY: buy 1 share as a radar; options are suggested on the 2nd dip
     MARKER_MODE_ENABLED = True
     MARKER_QUANTITY = 1
-    MARKER_ENTRY_END_HOUR = 15         # markers are held for days, so late-day entries are fine (Phase 2 window ends 15:05)
-    MARKER_ENTRY_END_MIN = 0
+    MARKER_ENTRY_END_HOUR = 15         # no practical cutoff for markers: they are held for days (last minute the market can fill)
+    MARKER_ENTRY_END_MIN = 29
     MARKER_RESPECT_DEFENSIVE = False   # False = 1-share markers still allowed on Phase 9 DEFENSIVE days (HALT always blocks). Set True to block them.
     MARKER_BUY_ON_CONFIRMATION = True  # buy the marker once Phase 1 confirms V-Recovery and score >= entry min (skip RSI trigger)
     MARKER_DISASTER_STOP_PCT = 8.0     # only automatic exit
