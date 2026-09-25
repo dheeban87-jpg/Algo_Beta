@@ -2171,7 +2171,8 @@ class Config:
 
     # Token limits (keep responses compact → lower output cost)
     PH9_GATE_MAX_PROMPT_TOKENS = 500               # Ceiling for entry/exit prompt tokens
-    PH9_GATE_MAX_RESPONSE_TOKENS = 200             # Ceiling for Haiku gate response
+    PH9_GATE_MAX_RESPONSE_TOKENS = 400             # Ceiling for Haiku gate response (was 200: JSON got cut off)
+    PH9_HEARTBEAT_MAX_RESPONSE_TOKENS = 1200       # Haiku heartbeat plan (was 600: JSON got cut off mid-field)
     PH9_STRATEGIC_MAX_PROMPT_TOKENS = 1500         # Ceiling for morning/EOD prompt tokens
     PH9_STRATEGIC_MAX_RESPONSE_TOKENS = 950        # Ceiling for Sonnet strategic response (20+ field JSON needs room)
 
