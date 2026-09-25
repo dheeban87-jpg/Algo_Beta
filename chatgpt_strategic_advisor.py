@@ -1514,7 +1514,7 @@ Return ONE JSON object and nothing else:
   "manage_plan": "<when to book, trail, cut; what to do on a gap against>",
   "reasoning": "<max 110 words, desk-head style>"
 }
-Scenario probabilities must sum to 100. If verdict is WAIT or SKIP, still fill scenarios, pre_mortem and
+Scenario probabilities must sum to 100. Keep every text field short (under 25 words each) so the whole JSON stays compact. If verdict is WAIT or SKIP, still fill scenarios, pre_mortem and
 reasoning; set strategy NONE and legs [].
 """
         user_prompt = "SETUP DATA (JSON):\n" + _json.dumps(context, default=str, indent=1)
@@ -1523,7 +1523,7 @@ reasoning; set strategy NONE and legs [].
         text = None
         try:
             resp = client.messages.create(
-                model=self.model, system=system_prompt, max_tokens=2500,
+                model=self.model, system=system_prompt, max_tokens=6000,
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[{"type": "web_search_20260209", "name": "web_search"}],
             )
@@ -1532,7 +1532,7 @@ reasoning; set strategy NONE and legs [].
             logger.warning(f"   Marker AI review with web search failed: {e1}")
             try:
                 resp = client.messages.create(
-                    model=self.model, system=system_prompt, max_tokens=2500,
+                    model=self.model, system=system_prompt, max_tokens=6000,
                     messages=[{"role": "user", "content": user_prompt}],
                 )
                 text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
