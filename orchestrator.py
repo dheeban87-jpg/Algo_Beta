@@ -2447,10 +2447,14 @@ class TradingOrchestrator:
                     
                     # v1.4.0: Brain directive gates — DEFENSIVE blocks all new entries
                     _brain_regime = getattr(self.phase9, 'todays_regime', 'NORMAL') if self.phase9 else 'NORMAL'
+                    # MARKER mode: entries are 1-share radar positions, so only HALT stops them
+                    _marker_only = (getattr(self.config, 'MARKER_MODE_ENABLED', False)
+                                    and getattr(self.config, 'MARKER_BUY_ON_CONFIRMATION', False))
                     if _brain_regime in ('HALT', 'DEFENSIVE') or self._ph4_brain_defensive:
-                        if _brain_regime == 'HALT' or self._ph4_brain_defensive:
+                        if _brain_regime == 'HALT' or (self._ph4_brain_defensive and not _marker_only):
                             logger.info(f"🧠 PH9 {_brain_regime}/DEFENSIVE — all new entries blocked")
                             return  # Skip entire cycle
+                        logger.info("🧠 PH9 DEFENSIVE — 1-share marker entries still allowed (marker mode)")
 
                     _cautious_size_mult = 0.5 if _brain_regime == 'CAUTIOUS' else 1.0
 
